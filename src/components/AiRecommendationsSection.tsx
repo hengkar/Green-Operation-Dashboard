@@ -57,15 +57,25 @@ export const AiRecommendationsSection: React.FC<AiRecommendationsSectionProps> =
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || `Server returned error (${res.status})`);
+      const contentType = res.headers.get('content-type') || '';
+      const responseText = await res.text();
+
+      // Check if response is HTML (e.g. from Nginx warmup or proxy gateway error)
+      if (responseText.trim().startsWith('<') || !contentType.includes('application/json')) {
+        // If server is warming up, give a clear prompt to retry
+        throw new Error('Server connection was briefly interrupted. Please click "Try again" to generate recommendations.');
       }
 
-      const result: AiRecommendationsResponse = await res.json();
-      if (!result.recommendations || result.recommendations.length === 0) {
-        throw new Error('Received empty recommendations from Gemini.');
+      const result = JSON.parse(responseText);
+
+      if (!res.ok) {
+        throw new Error(result.error || `Server returned error (${res.status})`);
       }
+
+      if (!result.recommendations || result.recommendations.length === 0) {
+        throw new Error('Received empty recommendations from AI service.');
+      }
+
       setData(result);
     } catch (err: any) {
       console.error('Failed to get recommendations:', err);
