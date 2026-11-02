@@ -1,0 +1,6 @@
+{
+  "name": "Green Ops Dashboard",
+  "description": "Hourly energy and carbon emission monitoring with AI-powered optimization recommendations for small manufacturing plants.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
