@@ -129,6 +129,20 @@ export function parseCSV(csvText: string, fileName = 'upload.csv', emissionFacto
       hour = dateObj.getHours();
     }
 
+    let dayOfWeek = 1;
+    if (!isNaN(dateObj.getTime())) {
+      dayOfWeek = dateObj.getDay();
+    } else {
+      const parsedD = new Date(dateStr);
+      if (!isNaN(parsedD.getTime())) {
+        dayOfWeek = parsedD.getDay();
+      }
+    }
+
+    // Production = Mon–Sat 07:00–23:00
+    // Monday (1) through Saturday (6) and hours 7 to 22 inclusive (07:00 up to 23:00)
+    const isProduction = dayOfWeek >= 1 && dayOfWeek <= 6 && hour >= 7 && hour < 23;
+
     const co2eKg = cleanKwh * emissionFactor;
 
     records.push({
@@ -137,9 +151,11 @@ export function parseCSV(csvText: string, fileName = 'upload.csv', emissionFacto
       dateStr,
       displayDate,
       hour,
+      dayOfWeek,
       line: rawLine.trim(),
       kwh: cleanKwh,
       co2eKg,
+      isProduction,
     });
   }
 
@@ -167,7 +183,7 @@ export function aggregatePlantData(records: EnergyRecord[], emissionFactor = 0.7
 
   const lineMap: Record<
     string,
-    { totalKwh: number; count: number; peakKwh: number; peakTimestamp: string }
+    { totalKwh: number; count: number; peakKwh: number; peakTimestamp: string; nonProductionKwh: number }
   > = {};
   const dailyMap: Record<string, { displayDate: string; totalKwh: number; lineKwh: Record<string, number> }> = {};
   const hourMap: Record<number, { totalKwh: number; count: number }> = {};
@@ -192,13 +208,18 @@ export function aggregatePlantData(records: EnergyRecord[], emissionFactor = 0.7
 
     // Line map
     if (!lineMap[r.line]) {
-      lineMap[r.line] = { totalKwh: 0, count: 0, peakKwh: 0, peakTimestamp: '' };
+      lineMap[r.line] = { totalKwh: 0, count: 0, peakKwh: 0, peakTimestamp: '', nonProductionKwh: 0 };
     }
     lineMap[r.line].totalKwh += r.kwh;
     lineMap[r.line].count += 1;
     if (r.kwh > lineMap[r.line].peakKwh) {
       lineMap[r.line].peakKwh = r.kwh;
       lineMap[r.line].peakTimestamp = r.timestamp;
+    }
+
+    // Determine non-production (outside Mon–Sat 07:00–23:00)
+    if (!r.isProduction) {
+      lineMap[r.line].nonProductionKwh += r.kwh;
     }
 
     // Daily map
@@ -225,6 +246,8 @@ export function aggregatePlantData(records: EnergyRecord[], emissionFactor = 0.7
     const item = lineMap[name];
     const sharePercent = totalKwh > 0 ? (item.totalKwh / totalKwh) * 100 : 0;
     const co2e = item.totalKwh * emissionFactor;
+    const nonProductionKwh = item.nonProductionKwh;
+    const nonProductionSharePercent = item.totalKwh > 0 ? (nonProductionKwh / item.totalKwh) * 100 : 0;
     return {
       name,
       totalKwh: item.totalKwh,
@@ -235,6 +258,8 @@ export function aggregatePlantData(records: EnergyRecord[], emissionFactor = 0.7
       co2eKg: co2e,
       co2eTons: co2e / 1000,
       color: LINE_COLORS[idx % LINE_COLORS.length],
+      nonProductionKwh,
+      nonProductionSharePercent,
     };
   });
 
@@ -308,6 +333,7 @@ export function aggregatePlantData(records: EnergyRecord[], emissionFactor = 0.7
     peakRecord,
     highestLoadHour,
     lowestLoadHour: lowestLoadHour.totalKwh === Infinity ? { hour: 0, totalKwh: 0 } : lowestLoadHour,
+    peakHourStr: `${highestLoadHour.hour.toString().padStart(2, '0')}:00`,
     offPeakVsOnPeak: {
       peakHoursKwh,
       offPeakHoursKwh,

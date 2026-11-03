@@ -145,6 +145,9 @@ export const DataTable: React.FC<DataTableProps> = ({ records, lines, emissionFa
                   <ArrowUpDown className="w-3 h-3 text-slate-400" />
                 </div>
               </th>
+              <th className="py-3 px-4">
+                Shift
+              </th>
               <th
                 onClick={() => handleSort('kwh')}
                 className="py-3 px-4 text-right cursor-pointer hover:bg-slate-200/60 transition-colors"
@@ -162,7 +165,7 @@ export const DataTable: React.FC<DataTableProps> = ({ records, lines, emissionFa
           <tbody className="divide-y divide-slate-100 font-mono">
             {currentRecords.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-8 text-center text-slate-400 font-sans">
+                <td colSpan={5} className="py-8 text-center text-slate-400 font-sans">
                   No records match your filters.
                 </td>
               </tr>
@@ -173,6 +176,17 @@ export const DataTable: React.FC<DataTableProps> = ({ records, lines, emissionFa
                   <tr key={r.id} className="hover:bg-emerald-50/40 transition-colors">
                     <td className="py-2.5 px-4 text-slate-800">{r.timestamp}</td>
                     <td className="py-2.5 px-4 font-sans font-medium text-slate-900">{r.line}</td>
+                    <td className="py-2.5 px-4 font-sans">
+                      {r.isProduction ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          Production
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          Non-prod
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-4 text-right font-bold text-slate-900">
                       {r.kwh.toFixed(1)}
                     </td>

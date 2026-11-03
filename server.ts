@@ -39,6 +39,7 @@ export interface EnergySummaryPayload {
   emissionFactor?: number;
   recordsCount?: number;
   dateRange?: { start: string; end: string };
+  peakHourStr?: string;
   lines?: Array<{
     name: string;
     totalKwh: number;
@@ -46,6 +47,8 @@ export interface EnergySummaryPayload {
     avgKwhPerHour: number;
     peakKwh: number;
     peakTimestamp: string;
+    nonProductionKwh?: number;
+    nonProductionSharePercent?: number;
   }>;
   peakHourOfDay?: { hour: number; totalKwh: number };
   offPeakVsOnPeak?: {
@@ -58,58 +61,104 @@ export interface EnergySummaryPayload {
 
 /**
  * Intelligent deterministic plant audit heuristic fallback
- * Used if Gemini service is temporarily experiencing high demand (503) or offline
+ * Quotes ONLY the computed numbers: kWh per line, non-production share per line,
+ * peak hour, and total t CO2e. If not available, writes "not available".
+ * Output format: Title · Evidence (with the number) · Est. kWh/month saved · Effort (L/M/H)
  */
 function generateHeuristicRecommendations(summary: EnergySummaryPayload) {
-  const totalKwh = summary.totalKwh || 0;
-  const factor = summary.emissionFactor || 0.74;
   const lines = summary.lines || [];
   const top = lines.length > 0 ? lines[0] : null;
   const second = lines.length > 1 ? lines[1] : null;
-  const peakSpike = summary.peakHourOfDay?.totalKwh || (top ? top.peakKwh : 100);
-  const nightIdle = summary.offPeakVsOnPeak?.nightIdleKwh || totalKwh * 0.15;
-  const nightIdlePercent = totalKwh > 0 ? (nightIdle / totalKwh) * 100 : 15;
+  const third = lines.length > 2 ? lines[2] : null;
 
-  const rec1SavingsKwh = Math.round((top ? top.totalKwh * 0.12 : totalKwh * 0.08) / 2);
-  const rec1Co2 = Math.round(rec1SavingsKwh * factor);
+  const peakHour = summary.peakHourStr || (summary.peakHourOfDay ? `${summary.peakHourOfDay.hour.toString().padStart(2, '0')}:00` : 'not available');
+  const totalCo2e = summary.totalCo2eTons !== undefined ? `${summary.totalCo2eTons.toFixed(2)} t CO2e` : 'not available';
 
-  const rec2SavingsKwh = Math.round(nightIdle * 0.35);
-  const rec2Co2 = Math.round(rec2SavingsKwh * factor);
+  const recommendations = [];
 
-  const rec3SavingsKwh = Math.round((second ? second.totalKwh * 0.09 : totalKwh * 0.05) / 2);
-  const rec3Co2 = Math.round(rec3SavingsKwh * factor);
+  // Item 1: Top line off-shift evidence
+  if (top) {
+    const evidence = top.nonProductionSharePercent !== undefined && top.nonProductionKwh !== undefined
+      ? `${top.nonProductionSharePercent.toFixed(1)}% of ${top.name} kWh is off-shift (${top.nonProductionKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh)`
+      : (top.totalKwh !== undefined ? `${top.name} consumes ${top.totalKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh` : 'not available');
+    const title = `Eliminate off-shift idle load on ${top.name}`;
+    const estSaved = top.nonProductionKwh ? Math.round(top.nonProductionKwh * 0.25).toLocaleString() : '1,500';
+    const effort = 'L';
+    recommendations.push({
+      title,
+      evidence,
+      estKwhMonthSaved: estSaved,
+      effort,
+      formattedLine: `${title} · ${evidence} · ${estSaved} · ${effort}`,
+    });
+  } else {
+    recommendations.push({
+      title: 'Automate off-shift auxiliary power down',
+      evidence: 'not available',
+      estKwhMonthSaved: '1,000',
+      effort: 'L',
+      formattedLine: 'Automate off-shift auxiliary power down · not available · 1,000 · L',
+    });
+  }
+
+  // Item 2: Peak hour and total t CO2e evidence
+  {
+    const title = 'Stagger batch operations during peak demand hour';
+    const evidence = `Plant peak hour is ${peakHour} contributing to ${totalCo2e}`;
+    const estSaved = top && top.totalKwh ? Math.round(top.totalKwh * 0.08).toLocaleString() : '2,000';
+    const effort = 'M';
+    recommendations.push({
+      title,
+      evidence,
+      estKwhMonthSaved: estSaved,
+      effort,
+      formattedLine: `${title} · ${evidence} · ${estSaved} · ${effort}`,
+    });
+  }
+
+  // Item 3: Second line non-production or total consumption evidence
+  if (second) {
+    const evidence = second.nonProductionSharePercent !== undefined && second.nonProductionKwh !== undefined
+      ? `${second.nonProductionSharePercent.toFixed(1)}% of ${second.name} kWh is off-shift (${second.nonProductionKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh)`
+      : (second.totalKwh !== undefined ? `${second.name} totals ${second.totalKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh` : 'not available');
+    const title = `Tune drive cycles and standby sleep on ${second.name}`;
+    const estSaved = second.nonProductionKwh ? Math.round(second.nonProductionKwh * 0.3).toLocaleString() : '800';
+    const effort = 'L';
+    recommendations.push({
+      title,
+      evidence,
+      estKwhMonthSaved: estSaved,
+      effort,
+      formattedLine: `${title} · ${evidence} · ${estSaved} · ${effort}`,
+    });
+  } else if (third) {
+    const evidence = third.totalKwh !== undefined ? `${third.name} consumes ${third.totalKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh` : 'not available';
+    const title = `Optimize run scheduling on ${third.name}`;
+    const estSaved = '600';
+    const effort = 'L';
+    recommendations.push({
+      title,
+      evidence,
+      estKwhMonthSaved: estSaved,
+      effort,
+      formattedLine: `${title} · ${evidence} · ${estSaved} · ${effort}`,
+    });
+  } else {
+    const evidence = `Total plant emissions currently at ${totalCo2e}`;
+    const title = 'Install sub-metering on auxiliary distribution panels';
+    const estSaved = '500';
+    const effort = 'L';
+    recommendations.push({
+      title,
+      evidence,
+      estKwhMonthSaved: estSaved,
+      effort,
+      formattedLine: `${title} · ${evidence} · ${estSaved} · ${effort}`,
+    });
+  }
 
   return {
-    executiveOverview: `Energy analysis reveals ${top ? top.name : 'the primary production line'} accounts for ${top ? top.sharePercent.toFixed(1) : 'a dominant'}% of facility consumption, while night-shift base-load draw represents ${nightIdlePercent.toFixed(1)}% of total electricity. High-yield savings center on process load shifting and idle power reduction.`,
-    recommendations: [
-      {
-        title: `Stagger Startups & Shift ${top ? top.name : 'Primary Line'} High-Demand Runs`,
-        targetLine: top ? top.name : 'Primary Production',
-        category: 'Peak Shaving',
-        recommendation: `${top ? top.name : 'The primary line'} drives peak plant demand up to ${top ? top.peakKwh.toFixed(1) : peakSpike.toFixed(1)} kWh. Reschedule energy-intensive heating or extrusion cycles away from the mid-day peak demand window (12:00–15:00), and implement a staggered sequence for motor starts to eliminate concurrent demand spikes.`,
-        estimatedSavings: `Saves ~${rec1SavingsKwh.toLocaleString()} kWh/bi-week (~10-14% on ${top ? top.name : 'line'})`,
-        co2Impact: `~${rec1Co2.toLocaleString()} kg CO2e bi-weekly (~${((rec1Co2 * 26) / 1000).toFixed(1)} t/yr)`,
-        implementationTime: 'Immediate (0-2 weeks)',
-      },
-      {
-        title: 'Automate Off-Shift Base-Load Shutdown on Auxiliary Subsystems',
-        targetLine: 'Facility Wide',
-        category: 'Idle Mitigation',
-        recommendation: `Off-shift and midnight hours consume ${nightIdle.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh (${nightIdlePercent.toFixed(1)}% of plant load) in continuous phantom draw from unloader compressors, hydraulic pumps, and chiller recirculation loops. Install digital master-lockout relays to automatically isolate secondary circuits outside scheduled production shifts.`,
-        estimatedSavings: `Saves ~${rec2SavingsKwh.toLocaleString()} kWh/bi-week (up to 35% of idle load)`,
-        co2Impact: `~${rec2Co2.toLocaleString()} kg CO2e bi-weekly (~${((rec2Co2 * 26) / 1000).toFixed(1)} t/yr)`,
-        implementationTime: '1-3 months',
-      },
-      {
-        title: `Install Variable Frequency Drives (VFD) on ${second ? second.name : 'Secondary Equipment'}`,
-        targetLine: second ? second.name : 'Secondary Production',
-        category: 'Equipment Tuning',
-        recommendation: `${second ? second.name : 'Secondary operations'} operates at fixed speed despite cyclic product throughput. Retrofit variable frequency drives (VFD) and thermal insulation jackets on motors and heating cylinders to match electrical draw with actual instantaneous demand.`,
-        estimatedSavings: `Saves ~${rec3SavingsKwh.toLocaleString()} kWh/bi-week (~8-12% reduction)`,
-        co2Impact: `~${rec3Co2.toLocaleString()} kg CO2e bi-weekly (~${((rec3Co2 * 26) / 1000).toFixed(1)} t/yr)`,
-        implementationTime: '1-3 months',
-      },
-    ],
+    recommendations: recommendations.slice(0, 3),
   };
 }
 
@@ -121,55 +170,45 @@ async function callGeminiWithRetry(ai: GoogleGenAI, prompt: string, modelName = 
         contents: prompt,
         config: {
           systemInstruction:
-            'You are a senior industrial energy auditor and sustainability consultant for manufacturing plants. You provide clear, concrete, actionable, and mathematically grounded energy efficiency recommendations based on real hourly consumption data.',
+            'You are an industrial energy efficiency consultant for small manufacturing plants. You provide clear, concrete recommendations that quote ONLY the provided computed numbers from the energy audit. If a number is not provided, you must say "not available". Return exactly 3 items, each formatted as Title · Evidence (with the number) · Est. kWh/month saved · Effort (L/M/H).',
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              executiveOverview: {
-                type: Type.STRING,
-                description: 'A 1-2 sentence high-level observation of the plant profile.',
-              },
               recommendations: {
                 type: Type.ARRAY,
-                description: 'Exactly 3 plain-language energy saving recommendations.',
+                description: 'Exactly 3 items, each as: Title · Evidence (with the number) · Est. kWh/month saved · Effort (L/M/H)',
                 items: {
                   type: Type.OBJECT,
                   properties: {
                     title: {
                       type: Type.STRING,
-                      description: 'Concise, action-oriented title.',
+                      description: 'Action title, e.g. "Fix compressed-air leaks"',
                     },
-                    targetLine: {
+                    evidence: {
                       type: Type.STRING,
-                      description: 'Specific line targeted (e.g. "Line 2", "All Lines", or "Facility Wide").',
+                      description:
+                        'Evidence quoting ONLY the computed numbers provided (e.g. "30% of air kWh is off-shift (7,286 kWh)"). If a number is not provided, write "not available".',
                     },
-                    category: {
+                    estKwhMonthSaved: {
                       type: Type.STRING,
-                      description: 'Category such as "Load Shifting", "Idle Mitigation", "Equipment Tuning", or "Peak Shaving".',
+                      description: 'Estimated kWh saved per month, e.g. "2,000"',
                     },
-                    recommendation: {
+                    effort: {
                       type: Type.STRING,
-                      description: 'Plain-language explanation of the problem and the specific action step to take.',
+                      description: 'Effort level, strictly "L", "M", or "H"',
                     },
-                    estimatedSavings: {
+                    formattedLine: {
                       type: Type.STRING,
-                      description: 'Quantified estimate (e.g. "~8-14% on Line 1", "Saves ~450 kWh/week").',
-                    },
-                    co2Impact: {
-                      type: Type.STRING,
-                      description: 'Estimated CO2 reduction in kg or metric tons.',
-                    },
-                    implementationTime: {
-                      type: Type.STRING,
-                      description: 'e.g. "Immediate (0-2 weeks)", "1-3 months", "Next scheduled turnaround".',
+                      description:
+                        'Full line formatted as: "Title · Evidence · Est. kWh/month saved · Effort (L/M/H)", e.g. "Fix compressed-air leaks · 30% of air kWh is off-shift (7,286 kWh) · 2,000 · L"',
                     },
                   },
-                  required: ['title', 'targetLine', 'category', 'recommendation', 'estimatedSavings', 'co2Impact', 'implementationTime'],
+                  required: ['title', 'evidence', 'estKwhMonthSaved', 'effort', 'formattedLine'],
                 },
               },
             },
-            required: ['executiveOverview', 'recommendations'],
+            required: ['recommendations'],
           },
         },
       });
@@ -186,12 +225,10 @@ async function callGeminiWithRetry(ai: GoogleGenAI, prompt: string, modelName = 
         err?.status === 503;
 
       if (isUnavailable && attempt < retries) {
-        // Wait 1.5s before retrying
         await new Promise((resolve) => setTimeout(resolve, 1500));
         continue;
       }
 
-      // If flash-3.8 is busy, try flash-lite as backup
       if (isUnavailable && modelName === 'gemini-3.8-flash') {
         try {
           return await callGeminiWithRetry(ai, prompt, 'gemini-3.1-flash-lite', 1);
@@ -218,57 +255,70 @@ app.post('/api/recommendations', async (req: Request, res: Response) => {
 
     const ai = getGeminiClient();
 
-    // If Gemini client cannot be initialized (e.g. missing API key in local testing),
-    // supply high-fidelity data-driven heuristic audit so user never encounters a blank/error screen
+    // If Gemini client cannot be initialized, use heuristic engine quoting only computed numbers
     if (!ai) {
       const heuristic = generateHeuristicRecommendations(summary);
       return res.json(heuristic);
     }
 
-    const linesInfo = (summary.lines || [])
+    // Format computed numbers specifically requested:
+    // 1. kWh per line
+    const kwhPerLineText = (summary.lines || [])
       .map(
         (l) =>
-          `  * ${l.name}: ${Number(l.totalKwh || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh (${Number(l.sharePercent || 0).toFixed(1)}% of plant total). Peak record: ${Number(l.peakKwh || 0).toFixed(1)} kWh at ${l.peakTimestamp || 'N/A'}`
+          `* ${l.name}: ${l.totalKwh !== undefined ? `${Number(l.totalKwh).toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh` : 'not available'}`
       )
-      .join('\n');
+      .join('\n') || 'not available';
 
-    const prompt = `Analyze the following manufacturing plant energy audit summary and generate exactly 3 plain-language, practical, and highly impactful energy-saving recommendations:
+    // 2. Non-production share per line
+    const nonProductionShareText = (summary.lines || [])
+      .map((l) => {
+        if (l.nonProductionSharePercent !== undefined && l.nonProductionKwh !== undefined) {
+          return `* ${l.name}: ${Number(l.nonProductionSharePercent).toFixed(1)}% of ${l.name} kWh is off-shift (${Number(l.nonProductionKwh).toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh)`;
+        }
+        return `* ${l.name}: not available`;
+      })
+      .join('\n') || 'not available';
 
-Summary Data:
-- Total Consumption: ${summary.totalKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh
-- Total Carbon Emissions: ${Number(summary.totalCo2eKg || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg CO2e (${Number(summary.totalCo2eTons || 0).toFixed(2)} metric tons CO2e)
-- Applied Grid Emission Factor: ${summary.emissionFactor || 0.74} kg CO2e/kWh
-- Time Period Covered: ${summary.dateRange?.start || 'N/A'} to ${summary.dateRange?.end || 'N/A'} (${summary.recordsCount || 0} hourly logs)
-- Production Lines Breakdown:
-${linesInfo || '  * Combined facility load'}
-${
-  summary.peakHourOfDay
-    ? `- Highest load hour of day: ${summary.peakHourOfDay.hour}:00 with ${Number(summary.peakHourOfDay.totalKwh || 0).toFixed(1)} kWh aggregate`
-    : ''
-}
-${
-  summary.offPeakVsOnPeak
-    ? `- Peak vs Off-Peak / Night Idle: Daytime/Peak: ${Number(summary.offPeakVsOnPeak.peakHoursKwh || 0).toFixed(1)} kWh, Night/Off-peak: ${Number(summary.offPeakVsOnPeak.offPeakHoursKwh || 0).toFixed(1)} kWh, Midnight-5am Idle Base Load: ${Number(summary.offPeakVsOnPeak.nightIdleKwh || 0).toFixed(1)} kWh`
-    : ''
-}
+    // 3. Peak hour
+    const peakHourText = summary.peakHourStr || (summary.peakHourOfDay ? `${summary.peakHourOfDay.hour.toString().padStart(2, '0')}:00` : 'not available');
 
-Requirements:
-1. Provide exactly 3 clear, distinct, and realistic energy-saving recommendations tailored to this plant's specific data (e.g., targeting the highest-consuming line, off-peak load shifting, nighttime base load / vampire draw reduction, equipment maintenance/VFDs, or motor scheduling).
-2. Use plain, accessible manufacturing operations language (avoid vague generic fluff).
-3. Specify realistic estimated impact and difficulty level for plant floor supervisors and facility engineers.`;
+    // 4. Total t CO2e
+    const totalCo2eText = summary.totalCo2eTons !== undefined ? `${Number(summary.totalCo2eTons).toFixed(2)} t CO2e` : 'not available';
+
+    const prompt = `The plant energy monitoring app has already computed the following totals:
+
+Computed Data:
+1. kWh per line:
+${kwhPerLineText}
+
+2. Non-production share per line:
+${nonProductionShareText}
+
+3. Peak hour:
+${peakHourText}
+
+4. Total t CO2e:
+${totalCo2eText}
+
+MANDATORY RULES:
+1. The "Evidence" field must quote ONLY the computed numbers above (e.g. "32.3% of Extrusion Line 1 kWh is off-shift (2,100 kWh)" or "Plant peak hour is 14:00 with 10.73 t CO2e"). If a number is not provided in the computed data, write "not available".
+2. "Est. kWh/month saved" must be a realistic estimated monthly savings number (e.g. "2,000", "1,500", "800") derived from the off-shift or peak reduction.
+3. Return exactly 3 items, each as:
+   Title · Evidence (with the number) · Est. kWh/month saved · Effort (L/M/H)
+   Example: "Fix compressed-air leaks · 30% of air kWh is off-shift (7,286 kWh) · 2,000 · L"
+4. Effort must be strictly "L", "M", or "H".`;
 
     try {
       const result = await callGeminiWithRetry(ai, prompt, 'gemini-3.8-flash', 2);
       return res.json(result);
     } catch (geminiError: any) {
       console.warn('Gemini API call failed, falling back to data heuristic audit:', geminiError?.message);
-      // Fallback to mathematical plant energy heuristic so user always receives valid recommendations
       const heuristic = generateHeuristicRecommendations(summary);
       return res.json(heuristic);
     }
   } catch (error: any) {
     console.error('Error generating recommendations:', error);
-    // Never return 502/503/504 which Nginx intercepts and converts to HTML
     return res.status(200).json(generateHeuristicRecommendations(req.body || { totalKwh: 1000 }));
   }
 });
@@ -285,7 +335,6 @@ async function startServer() {
       res.sendFile(path.resolve(distPath, 'index.html'));
     });
   } else {
-    // In dev or when dist is not built, mount Vite middlewares
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

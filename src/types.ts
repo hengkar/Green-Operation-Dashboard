@@ -1,3 +1,5 @@
+export type ShiftFilter = 'ALL' | 'PRODUCTION' | 'NON_PRODUCTION';
+
 export interface RawEnergyRow {
   timestamp: string;
   line: string;
@@ -10,9 +12,11 @@ export interface EnergyRecord {
   dateStr: string; // YYYY-MM-DD
   displayDate: string;
   hour: number; // 0-23
+  dayOfWeek: number; // 0 (Sun) - 6 (Sat)
   line: string;
   kwh: number;
   co2eKg: number;
+  isProduction: boolean;
 }
 
 export interface LineSummary {
@@ -25,6 +29,8 @@ export interface LineSummary {
   co2eKg: number;
   co2eTons: number;
   color: string;
+  nonProductionKwh: number;
+  nonProductionSharePercent: number;
 }
 
 export interface DailyTrendPoint {
@@ -70,6 +76,7 @@ export interface PlantSummary {
     hour: number;
     totalKwh: number;
   };
+  peakHourStr: string;
   offPeakVsOnPeak: {
     peakHoursKwh: number; // 8am - 8pm
     offPeakHoursKwh: number; // 8pm - midnight
@@ -79,15 +86,15 @@ export interface PlantSummary {
 
 export interface AiRecommendation {
   title: string;
-  targetLine: string;
-  category: string;
-  recommendation: string;
-  estimatedSavings: string;
-  co2Impact: string;
-  implementationTime: string;
+  evidence: string;
+  estKwhMonthSaved: string;
+  effort: 'L' | 'M' | 'H';
+  formattedLine: string;
+  targetLine?: string;
+  category?: string;
 }
 
 export interface AiRecommendationsResponse {
-  executiveOverview: string;
+  executiveOverview?: string;
   recommendations: AiRecommendation[];
 }

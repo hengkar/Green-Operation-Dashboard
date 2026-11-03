@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { DailyTrendPoint, LineSummary } from '../types';
-import { TrendingUp, Calendar, Filter, Sparkles } from 'lucide-react';
+import { Layers, Calendar, Sparkles, Activity } from 'lucide-react';
 
 interface DailyTrendChartProps {
   dailyTrends: DailyTrendPoint[];
@@ -8,178 +8,194 @@ interface DailyTrendChartProps {
   emissionFactor: number;
 }
 
-export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({ dailyTrends, lines, emissionFactor }) => {
-  const [selectedLine, setSelectedLine] = useState<string>('ALL');
+export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({
+  dailyTrends,
+  lines,
+  emissionFactor,
+}) => {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-
-  // Compute values based on selected line filter
-  const points = useMemo(() => {
-    return dailyTrends.map((d) => {
-      let kwh = 0;
-      if (selectedLine === 'ALL') {
-        kwh = d.totalKwh;
-      } else {
-        kwh = d.lineKwh[selectedLine] || 0;
-      }
-      return {
-        dateStr: d.dateStr,
-        displayDate: d.displayDate,
-        kwh,
-        co2eKg: kwh * emissionFactor,
-        allLineKwh: d.lineKwh,
-      };
-    });
-  }, [dailyTrends, selectedLine, emissionFactor]);
-
-  const { maxVal, minVal, avgVal, peakPoint } = useMemo(() => {
-    if (points.length === 0) return { maxVal: 100, minVal: 0, avgVal: 0, peakPoint: null };
-
-    let max = -Infinity;
-    let min = Infinity;
-    let sum = 0;
-    let peak = points[0];
-
-    for (const p of points) {
-      if (p.kwh > max) {
-        max = p.kwh;
-        peak = p;
-      }
-      if (p.kwh < min) min = p.kwh;
-      sum += p.kwh;
-    }
-
-    const avg = sum / points.length;
-    return {
-      maxVal: max <= 0 ? 100 : max * 1.15, // Headroom for chart
-      minVal: 0,
-      avgVal: avg,
-      peakPoint: peak,
-    };
-  }, [points]);
+  const [highlightedLine, setHighlightedLine] = useState<string | null>(null);
 
   // SVG dimensions
   const width = 800;
-  const height = 280;
-  const padding = { top: 30, right: 25, bottom: 40, left: 55 };
+  const height = 300;
+  const padding = { top: 30, right: 30, bottom: 45, left: 60 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
+  // Maximum cumulative kWh across all days for Y-scale
+  const { maxVal, peakPoint, avgVal } = useMemo(() => {
+    if (dailyTrends.length === 0) {
+      return { maxVal: 100, peakPoint: null, avgVal: 0 };
+    }
+
+    let max = 0;
+    let sum = 0;
+    let peak = dailyTrends[0];
+
+    for (const d of dailyTrends) {
+      if (d.totalKwh > max) {
+        max = d.totalKwh;
+        peak = d;
+      }
+      sum += d.totalKwh;
+    }
+
+    const avg = sum / dailyTrends.length;
+    return {
+      maxVal: max <= 0 ? 100 : max * 1.15, // Headroom for stacked peaks
+      peakPoint: peak,
+      avgVal: avg,
+    };
+  }, [dailyTrends]);
+
   // Coordinate mappers
   const getX = (index: number) => {
-    if (points.length <= 1) return padding.left + chartW / 2;
-    return padding.left + (index / (points.length - 1)) * chartW;
+    if (dailyTrends.length <= 1) return padding.left + chartW / 2;
+    return padding.left + (index / (dailyTrends.length - 1)) * chartW;
   };
 
   const getY = (val: number) => {
     if (maxVal === 0) return padding.top + chartH;
-    const ratio = (val - minVal) / (maxVal - minVal);
+    const ratio = Math.max(0, Math.min(1, val / maxVal));
     return padding.top + chartH - ratio * chartH;
   };
 
-  // Build SVG path
-  const linePath = useMemo(() => {
-    if (points.length === 0) return '';
-    return points.reduce((acc, p, idx) => {
-      const x = getX(idx);
-      const y = getY(p.kwh);
-      return idx === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
-    }, '');
-  }, [points, maxVal]);
+  // Compute stacked layers for each line
+  const stackedLayers = useMemo(() => {
+    if (dailyTrends.length === 0 || lines.length === 0) return [];
 
-  const areaPath = useMemo(() => {
-    if (points.length === 0) return '';
-    const firstX = getX(0);
-    const lastX = getX(points.length - 1);
-    const bottomY = padding.top + chartH;
-    return `${linePath} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
-  }, [linePath, points.length]);
+    let prevCumulative = new Array(dailyTrends.length).fill(0);
+
+    return lines.map((line) => {
+      const lineDailyVals = dailyTrends.map((d) => d.lineKwh[line.name] || 0);
+      const currCumulative = prevCumulative.map((prev, i) => prev + lineDailyVals[i]);
+
+      // Forward path along upper boundary
+      const forwardPoints = currCumulative.map(
+        (val, i) => `${i === 0 ? 'M' : 'L'} ${getX(i).toFixed(1)} ${getY(val).toFixed(1)}`
+      );
+
+      // Backward path along lower boundary
+      const backwardPoints = prevCumulative
+        .slice()
+        .reverse()
+        .map((val, rIdx) => {
+          const origIdx = dailyTrends.length - 1 - rIdx;
+          return `L ${getX(origIdx).toFixed(1)} ${getY(val).toFixed(1)}`;
+        });
+
+      const areaPath = `${forwardPoints.join(' ')} ${backwardPoints.join(' ')} Z`;
+      const topLinePath = forwardPoints.join(' ');
+
+      // Store lower and upper values for hover lookup
+      const layerData = {
+        line,
+        areaPath,
+        topLinePath,
+        lowerVals: [...prevCumulative],
+        upperVals: [...currCumulative],
+      };
+
+      // Advance baseline for next line
+      prevCumulative = currCumulative;
+      return layerData;
+    });
+  }, [dailyTrends, lines, maxVal]);
 
   // Y-axis grid ticks
   const yTicks = [0, maxVal * 0.25, maxVal * 0.5, maxVal * 0.75, maxVal];
 
-  // X-axis sample dates
+  // X-axis sample date indexes
   const xTickIndices = useMemo(() => {
-    if (points.length <= 6) return points.map((_, i) => i);
-    const step = Math.ceil(points.length / 6);
+    if (dailyTrends.length <= 7) return dailyTrends.map((_, i) => i);
+    const step = Math.ceil(dailyTrends.length / 6);
     const result: number[] = [];
-    for (let i = 0; i < points.length; i += step) {
+    for (let i = 0; i < dailyTrends.length; i += step) {
       result.push(i);
     }
-    if (result[result.length - 1] !== points.length - 1) {
-      result.push(points.length - 1);
+    if (result[result.length - 1] !== dailyTrends.length - 1) {
+      result.push(dailyTrends.length - 1);
     }
     return result;
-  }, [points.length]);
+  }, [dailyTrends.length]);
 
-  const activePoint = hoveredIdx !== null && points[hoveredIdx] ? points[hoveredIdx] : null;
+  const activeDay = hoveredIdx !== null && dailyTrends[hoveredIdx] ? dailyTrends[hoveredIdx] : null;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between">
-      {/* Header with Title and Filter */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
         <div>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
+              <Layers className="w-4 h-4" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">Daily kWh Trend</h3>
+            <h3 className="text-base font-bold text-slate-900">
+              Stacked Daily kWh by Line
+            </h3>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Total daily electricity consumption trend over time
+            Cumulative daily energy profile stacked by production line
           </p>
         </div>
 
-        {/* Line filter selector */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 flex items-center gap-1">
-            <Filter className="w-3.5 h-3.5" /> Filter Line:
-          </span>
-          <select
-            value={selectedLine}
-            onChange={(e) => {
-              setSelectedLine(e.target.value);
-              setHoveredIdx(null);
-            }}
-            className="bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-800 font-medium rounded-lg px-2.5 py-1 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-          >
-            <option value="ALL">All Lines Combined</option>
-            {lines.map((l) => (
-              <option key={l.name} value={l.name}>
-                {l.name}
-              </option>
-            ))}
-          </select>
+        {/* Legend pills with interactive highlight */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {lines.map((line) => {
+            const isSelected = highlightedLine === line.name;
+            const isDimmed = highlightedLine !== null && !isSelected;
+
+            return (
+              <button
+                key={line.name}
+                type="button"
+                onMouseEnter={() => setHighlightedLine(line.name)}
+                onMouseLeave={() => setHighlightedLine(null)}
+                onClick={() => setHighlightedLine(isSelected ? null : line.name)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                    : isDimmed
+                    ? 'opacity-40 bg-white border-slate-200 text-slate-500'
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                }`}
+                title={`Highlight ${line.name}`}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: line.color }}
+                />
+                <span className="truncate max-w-[110px]">{line.name}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Summary KPI chips */}
+      {/* KPI chips */}
       <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
         <div className="bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1 text-slate-600">
-          Daily Avg: <strong className="text-slate-900 font-mono">{avgVal.toFixed(1)} kWh</strong>
+          Daily Average: <strong className="text-slate-900 font-mono">{avgVal.toFixed(1)} kWh</strong>
         </div>
         {peakPoint && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 text-emerald-800">
-            Peak Day: <strong className="font-mono">{peakPoint.displayDate}</strong> ({peakPoint.kwh.toFixed(1)} kWh)
+            Peak Day: <strong className="font-mono">{peakPoint.displayDate}</strong> ({peakPoint.totalKwh.toFixed(1)} kWh)
           </div>
         )}
+        <div className="bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1 text-teal-800">
+          Stacked Lines: <strong>{lines.length}</strong>
+        </div>
       </div>
 
-      {/* Interactive SVG Chart Container */}
-      <div className="relative w-full aspect-[16/8] sm:aspect-[16/6] min-h-[220px]">
+      {/* Interactive Stacked Area SVG */}
+      <div className="relative w-full aspect-[16/7] min-h-[240px]">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full h-full overflow-visible select-none"
           onMouseLeave={() => setHoveredIdx(null)}
         >
-          <defs>
-            <linearGradient id="emeraldAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#059669" stopOpacity="0.28" />
-              <stop offset="85%" stopColor="#059669" stopOpacity="0.02" />
-              <stop offset="100%" stopColor="#059669" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-
-          {/* Grid lines & Y labels */}
+          {/* Y Axis Grid lines & Labels */}
           {yTicks.map((tickVal, i) => {
             const y = getY(tickVal);
             return (
@@ -207,7 +223,7 @@ export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({ dailyTrends, l
             );
           })}
 
-          {/* Average Reference Line */}
+          {/* Average Total Line Reference */}
           {avgVal > 0 && (
             <g>
               <line
@@ -215,7 +231,7 @@ export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({ dailyTrends, l
                 y1={getY(avgVal)}
                 x2={width - padding.right}
                 y2={getY(avgVal)}
-                stroke="#0d9488"
+                stroke="#0f766e"
                 strokeDasharray="4 4"
                 strokeWidth="1.2"
                 opacity="0.8"
@@ -225,32 +241,51 @@ export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({ dailyTrends, l
                 y={getY(avgVal) - 4}
                 textAnchor="end"
                 fontSize="9"
-                fill="#0d9488"
-                fontWeight="600"
+                fill="#0f766e"
+                fontWeight="700"
               >
-                Avg ({avgVal.toFixed(0)} kWh)
+                Avg Total ({avgVal.toFixed(0)} kWh)
               </text>
             </g>
           )}
 
-          {/* Area fill */}
-          {areaPath && <path d={areaPath} fill="url(#emeraldAreaGrad)" />}
+          {/* Stacked Area Layers */}
+          {stackedLayers.map((layer) => {
+            const isHighlighted = highlightedLine === layer.line.name;
+            const isDimmed = highlightedLine !== null && !isHighlighted;
 
-          {/* Line stroke */}
-          {linePath && (
-            <path
-              d={linePath}
-              fill="none"
-              stroke="#059669"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
+            return (
+              <g
+                key={layer.line.name}
+                className="transition-opacity duration-200"
+                style={{ opacity: isDimmed ? 0.25 : 1 }}
+              >
+                {/* Area Fill */}
+                <path
+                  d={layer.areaPath}
+                  fill={layer.line.color}
+                  fillOpacity={isHighlighted ? 0.9 : 0.72}
+                  className="transition-all duration-150 cursor-pointer"
+                  onMouseEnter={() => setHighlightedLine(layer.line.name)}
+                  onMouseLeave={() => setHighlightedLine(null)}
+                />
+
+                {/* Top Stroke for Sharp Separation */}
+                <path
+                  d={layer.topLinePath}
+                  fill="none"
+                  stroke={layer.line.color}
+                  strokeWidth={isHighlighted ? 2.5 : 1.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </g>
+            );
+          })}
 
           {/* X Axis Date Labels */}
           {xTickIndices.map((idx) => {
-            const p = points[idx];
+            const p = dailyTrends[idx];
             if (!p) return null;
             const x = getX(idx);
             return (
@@ -261,41 +296,30 @@ export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({ dailyTrends, l
                 textAnchor="middle"
                 fontSize="10"
                 fill="#64748b"
+                fontWeight="500"
               >
                 {p.displayDate}
               </text>
             );
           })}
 
-          {/* Interactive vertical hover line & points */}
-          {points.map((p, idx) => {
+          {/* Interactive vertical hover trigger columns */}
+          {dailyTrends.map((d, idx) => {
             const x = getX(idx);
-            const y = getY(p.kwh);
             const isHovered = hoveredIdx === idx;
+            const colWidth = chartW / Math.max(1, dailyTrends.length);
 
             return (
               <g key={idx}>
-                {/* Invisible hover trigger columns */}
                 <rect
-                  x={x - (chartW / points.length / 2)}
+                  x={x - colWidth / 2}
                   y={padding.top}
-                  width={chartW / points.length}
+                  width={colWidth}
                   height={chartH}
                   fill="transparent"
                   className="cursor-pointer"
                   onMouseEnter={() => setHoveredIdx(idx)}
                   onTouchStart={() => setHoveredIdx(idx)}
-                />
-
-                {/* Point circle */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={isHovered ? 5.5 : 3}
-                  fill={isHovered ? '#047857' : '#ffffff'}
-                  stroke="#059669"
-                  strokeWidth={isHovered ? 2.5 : 1.8}
-                  className="transition-all duration-150 pointer-events-none"
                 />
 
                 {isHovered && (
@@ -304,9 +328,9 @@ export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({ dailyTrends, l
                     y1={padding.top}
                     x2={x}
                     y2={padding.top + chartH}
-                    stroke="#059669"
+                    stroke="#0f172a"
                     strokeDasharray="2 2"
-                    strokeWidth="1.2"
+                    strokeWidth="1.5"
                     className="pointer-events-none"
                   />
                 )}
@@ -315,46 +339,72 @@ export const DailyTrendChart: React.FC<DailyTrendChartProps> = ({ dailyTrends, l
           })}
         </svg>
 
-        {/* Floating Tooltip Card */}
-        {activePoint && hoveredIdx !== null && (
+        {/* Hover Tooltip Breakdown */}
+        {activeDay && hoveredIdx !== null && (
           <div
-            className="absolute z-10 pointer-events-none bg-slate-900/95 backdrop-blur text-white text-xs p-3 rounded-xl shadow-xl border border-slate-700 w-56 transform -translate-x-1/2 transition-all duration-75"
+            className="absolute z-20 pointer-events-none bg-slate-900/95 backdrop-blur-md text-white text-xs p-3.5 rounded-xl shadow-xl border border-slate-700 w-64 transform -translate-x-1/2 transition-all duration-75"
             style={{
-              left: `${(getX(hoveredIdx) / width) * 100}%`,
-              top: `${Math.max(10, (getY(activePoint.kwh) / height) * 100 - 35)}%`,
+              left: `${Math.max(18, Math.min(82, (getX(hoveredIdx) / width) * 100))}%`,
+              top: `${Math.max(8, (getY(activeDay.totalKwh) / height) * 100 - 30)}%`,
             }}
           >
-            <div className="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-1.5">
-              <span className="font-semibold text-slate-200">{activePoint.displayDate}</span>
-              <span className="text-[10px] text-emerald-400 font-mono">
-                {(activePoint.co2eKg / 1000).toFixed(2)} t CO2e
+            {/* Tooltip Header */}
+            <div className="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-2">
+              <span className="font-bold text-slate-100 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                {activeDay.displayDate}
+              </span>
+              <span className="text-[10px] text-emerald-400 font-mono font-semibold">
+                {((activeDay.totalKwh * emissionFactor) / 1000).toFixed(2)} t CO2e
               </span>
             </div>
 
-            <div className="flex items-baseline justify-between">
-              <span className="text-slate-400">Total Consumption:</span>
-              <span className="text-sm font-bold text-emerald-400 font-mono">
-                {activePoint.kwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh
+            {/* Total Daily Power */}
+            <div className="flex items-baseline justify-between mb-2">
+              <span className="text-slate-400">Total Stacked:</span>
+              <span className="text-sm font-extrabold text-emerald-400 font-mono">
+                {activeDay.totalKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+                <span className="text-xs font-normal">kWh</span>
               </span>
             </div>
 
-            {selectedLine === 'ALL' && Object.keys(activePoint.allLineKwh).length > 0 && (
-              <div className="mt-2 pt-1.5 border-t border-slate-800 space-y-1">
-                <span className="text-[10px] uppercase font-semibold text-slate-400">Lines:</span>
-                {Object.entries(activePoint.allLineKwh).slice(0, 4).map(([lineName, val]) => (
-                  <div key={lineName} className="flex justify-between text-[11px]">
-                    <span className="text-slate-300 truncate max-w-[120px]">{lineName}</span>
-                    <span className="font-mono text-slate-200">{val.toFixed(0)} kWh</span>
+            {/* Line-by-Line Breakdown for this day */}
+            <div className="pt-2 border-t border-slate-800 space-y-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                Line Breakdown:
+              </span>
+              {lines.map((l) => {
+                const lineKwh = activeDay.lineKwh[l.name] || 0;
+                const sharePercent =
+                  activeDay.totalKwh > 0 ? (lineKwh / activeDay.totalKwh) * 100 : 0;
+
+                return (
+                  <div key={l.name} className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center gap-1.5 truncate max-w-[130px]">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: l.color }}
+                      />
+                      <span className="text-slate-300 truncate">{l.name}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="text-slate-200 font-bold">{lineKwh.toFixed(1)} kWh</span>
+                      <span className="text-[10px] text-slate-400 w-10 text-right">
+                        ({sharePercent.toFixed(0)}%)
+                      </span>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
 
-      <div className="text-[11px] text-slate-400 mt-2 text-right">
-        Hover or tap any date to inspect daily kWh & carbon footprint
+      <div className="text-[11px] text-slate-400 mt-3 flex items-center justify-between">
+        <span>Hover to inspect daily line proportions & carbon</span>
+        <span>Click legend to highlight line</span>
       </div>
     </div>
   );

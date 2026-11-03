@@ -102,13 +102,16 @@ export const LineBarChart: React.FC<LineBarChartProps> = ({ lines, totalPlantKwh
               </div>
 
               {/* Sub-row telemetry */}
-              <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5 pt-1 border-t border-slate-100">
+              <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 mt-1.5 pt-1 border-t border-slate-100 gap-2">
                 <span className="flex items-center gap-1">
                   <Activity className="w-3 h-3 text-slate-400" />
-                  Avg: <strong className="text-slate-600 font-mono">{line.avgKwhPerHour.toFixed(1)} kWh/hr</strong>
+                  Avg: <strong className="text-slate-700 font-mono">{line.avgKwhPerHour.toFixed(1)} kWh/hr</strong>
                 </span>
                 <span>
-                  Peak spike: <strong className="text-slate-600 font-mono">{line.peakKwh.toFixed(1)} kWh</strong>
+                  Off-shift share: <strong className="text-amber-800 font-mono">{line.nonProductionSharePercent.toFixed(1)}%</strong> ({line.nonProductionKwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh)
+                </span>
+                <span>
+                  Peak spike: <strong className="text-slate-700 font-mono">{line.peakKwh.toFixed(1)} kWh</strong>
                 </span>
               </div>
             </div>
