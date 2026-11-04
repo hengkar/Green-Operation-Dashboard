@@ -11,15 +11,17 @@ import {
   ArrowRight,
   Info,
   Clock,
+  Github,
 } from 'lucide-react';
 import { generateSamplePlantCsv, downloadCsvFile } from '../utils/csvParser';
 
 interface EmptyStateProps {
   onFileLoaded: (csvText: string, fileName: string) => void;
   parseErrors: string[];
+  onOpenGitHubModal?: () => void;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ onFileLoaded, parseErrors }) => {
+export const EmptyState: React.FC<EmptyStateProps> = ({ onFileLoaded, parseErrors, onOpenGitHubModal }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -110,6 +112,20 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onFileLoaded, parseError
           Upload your plant's hourly energy logs to analyze production line power consumption,
           track carbon emissions in real-time, and generate targeted AI energy-saving recommendations.
         </p>
+
+        {onOpenGitHubModal && (
+          <div className="mt-4 inline-flex items-center gap-2 text-xs text-slate-600 bg-white/90 border border-slate-200/90 rounded-full px-3.5 py-1.5 shadow-xs">
+            <Github className="w-3.5 h-3.5 text-slate-700" />
+            <span>Hosting on GitHub Pages?</span>
+            <button
+              type="button"
+              onClick={onOpenGitHubModal}
+              className="text-emerald-700 font-bold hover:underline cursor-pointer"
+            >
+              Export Standalone HTML5 Bundle &rarr;
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Upload Area */}

@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Green Ops Dashboard - Industrial Energy & Carbon Intelligence</title>
+  <meta name="description" content="Industrial manufacturing energy analytics and carbon footprint monitoring dashboard for small plants, with hourly sub-metering, shift filtering, and client-side AI energy audits." />
+  <meta property="og:title" content="Green Ops Dashboard" />
+  <meta property="og:description" content="Hourly energy and carbon emission monitoring with AI-powered optimization recommendations for small manufacturing plants." />
+  <meta property="og:type" content="website" />
+  
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              200: '#a7f3d0',
+              300: '#6ee7b7',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b',
+              950: '#022c22',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    }
+    .font-mono-numbers {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum';
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-brand-600 text-white flex items-center justify-center shadow-md shadow-brand-600/20 shrink-0">
+          <!-- Leaf / Power SVG Icon -->
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">Green Ops Dashboard</h1>
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-brand-700 bg-brand-50 border border-brand-200/60 px-2 py-0.5 rounded">HTML5 Static</span>
+          </div>
+          <p class="text-xs text-slate-500 hidden sm:block">Industrial Energy & Carbon Intelligence for Small Manufacturing</p>
+        </div>
+      </div>
+
+      <!-- Header Actions -->
+      <div class="flex items-center gap-2.5">
+        <!-- Emission Factor Config Pill -->
+        <div class="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/70 transition-colors border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700">
+          <span class="text-slate-500 hidden md:inline">Factor:</span>
+          <input 
+            type="number" 
+            id="emissionFactorInput" 
+            step="0.001" 
+            min="0.001" 
+            max="5.0" 
+            value="0.740" 
+            class="w-16 px-1.5 py-0.5 bg-white border border-slate-300 rounded text-center font-mono text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500" 
+            title="Emission factor in kg CO2e per kWh"
+          />
+          <span class="font-mono text-[11px] text-slate-600">kg/kWh</span>
+        </div>
+
+        <!-- Quick Demo Button -->
+        <button 
+          id="headerDemoBtn" 
+          type="button" 
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 active:scale-95 transition rounded-lg shadow-sm shadow-brand-700/20 cursor-pointer"
+        >
+          <svg class="w-3.5 h-3.5 text-brand-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          <span class="hidden sm:inline">Load Demo Data</span>
+          <span class="sm:hidden">Demo</span>
+        </button>
+
+        <!-- New File Upload Trigger (Shown when data is loaded) -->
+        <button 
+          id="newUploadBtn" 
+          type="button" 
+          class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg shadow-sm transition cursor-pointer"
+        >
+          <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+          </svg>
+          <span class="hidden sm:inline">Upload CSV</span>
+          <span class="sm:hidden">Upload</span>
+        </button>
+
+        <!-- GitHub Repo Info Link -->
+        <button 
+          id="githubDeployModalBtn" 
+          type="button" 
+          class="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition"
+          title="GitHub Pages Deployment Guide"
+        >
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ========================================== -->
+    <!-- VIEW A: EMPTY STATE (Before File Upload) -->
+    <!-- ========================================== -->
+    <section id="emptyStateSection" class="max-w-4xl mx-auto py-8 sm:py-12 animate-fade-in">
+      <div class="text-center max-w-2xl mx-auto mb-8">
+        <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-800 bg-brand-100/80 px-3 py-1 rounded-full mb-3">
+          <svg class="w-3.5 h-3.5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+          </svg>
+          Sub-Meter Energy Intelligence
+        </div>
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">Green Ops Dashboard</h2>
+        <p class="mt-2 text-sm sm:text-base text-slate-600 leading-relaxed">
+          Upload your plant's hourly energy logs to analyze sub-meter power, monitor carbon footprints in real-time, and run client-side AI energy audits.
+        </p>
+      </div>
+
+      <!-- Upload Dropzone Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
+        <div 
+          id="dropZone" 
+          class="p-8 sm:p-12 m-4 sm:m-6 border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl bg-slate-50/60 hover:bg-brand-50/30 transition-all text-center cursor-pointer group"
+        >
+          <input type="file" id="fileInput" accept=".csv,text/csv,text/plain" class="hidden" />
+
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-teal-500 text-white flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-600/20 group-hover:scale-105 transition-transform">
+            <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+          </div>
+
+          <h3 class="text-lg font-bold text-slate-800">Drop your hourly plant CSV here</h3>
+          <p class="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+            Drag and drop your file, or <span class="text-brand-600 font-semibold underline underline-offset-2">browse local files</span>
+          </p>
+
+          <!-- Format Pills -->
+          <div class="mt-5 inline-flex flex-wrap items-center justify-center gap-2 text-xs text-slate-600 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+            <span class="font-semibold text-slate-700">Required CSV Columns:</span>
+            <span class="px-2 py-0.5 rounded bg-brand-50 text-brand-700 font-mono font-medium border border-brand-200">timestamp</span>
+            <span class="text-slate-400">+</span>
+            <span class="px-2 py-0.5 rounded bg-teal-50 text-teal-700 font-mono font-medium border border-teal-200">line</span>
+            <span class="text-slate-400">+</span>
+            <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-mono font-medium border border-amber-200">kWh</span>
+          </div>
+        </div>
+
+        <!-- Parse Errors -->
+        <div id="parseErrorBox" class="hidden mx-6 mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs">
+          <div class="font-semibold text-sm mb-1 text-red-900 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            Error Parsing CSV File
+          </div>
+          <p id="parseErrorMessage" class="text-red-700"></p>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="bg-slate-50 border-t border-slate-100 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="text-xs text-slate-500">
+            Emission standard: <strong>0.740 kg CO2e / kWh</strong> (editable)
+          </div>
+
+          <div class="flex items-center gap-2.5 w-full sm:w-auto">
+            <button 
+              id="downloadTemplateBtn" 
+              type="button" 
+              class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg shadow-sm transition cursor-pointer"
+            >
+              <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Download Template
+            </button>
+
+            <button 
+              id="emptyStateDemoBtn" 
+              type="button" 
+              class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm shadow-brand-700/20 transition cursor-pointer"
+            >
+              <svg class="w-3.5 h-3.5 text-brand-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+              Load Demo Plant Data
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-bold text-brand-700 mb-1">Production Shift Logic</div>
+          <p class="text-xs text-slate-600">Filters between Production (Mon-Sat 07:00-23:00) and Non-Production to isolate vampire loads.</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-bold text-brand-700 mb-1">Stacked Daily Trends</div>
+          <p class="text-xs text-slate-600">Dynamic stacked area visualization showing daily kWh volume by production line with hover tooltips.</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-bold text-brand-700 mb-1">Client-Side AI Audit</div>
+          <p class="text-xs text-slate-600">Generates 3 prioritized recommendations quoting exact computed numbers. Zero server required.</p>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ========================================== -->
+    <!-- VIEW B: ACTIVE DASHBOARD (After Data Loaded) -->
+    <!-- ========================================== -->
+    <div id="dashboardSection" class="hidden space-y-6 animate-fade-in">
+
+      <!-- TOP TOOLBAR: File Info & Shift Toggle -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        
+        <!-- File Info & Dataset Meta -->
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-500">Active Dataset:</span>
+            <span id="activeFileName" class="text-sm font-bold text-slate-900 font-mono">sample_plant_data.csv</span>
+            <span id="recordCountBadge" class="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">0 logs</span>
+          </div>
+          <div class="text-xs text-slate-500 mt-0.5">
+            <span id="dateRangeSpan">Analyzing hourly records</span>
+            <span class="mx-1.5 text-slate-300">·</span>
+            <span id="activeShiftNotice" class="text-brand-700 font-medium">All Operating Hours</span>
+          </div>
+        </div>
+
+        <!-- Shift Filter Toggle (Mon-Sat 07:00-23:00) -->
+        <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200 self-start md:self-auto">
+          <button 
+            type="button" 
+            data-shift="all" 
+            class="shift-toggle-btn active-shift px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer bg-white text-slate-900 shadow-sm font-semibold"
+          >
+            All Hours
+          </button>
+          <button 
+            type="button" 
+            data-shift="production" 
+            class="shift-toggle-btn px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer text-slate-600 hover:text-slate-900"
+            title="Mon–Sat 07:00–23:00"
+          >
+            Production
+          </button>
+          <button 
+            type="button" 
+            data-shift="non-production" 
+            class="shift-toggle-btn px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer text-slate-600 hover:text-slate-900"
+            title="Nights (23:00–07:00) and All Sundays"
+          >
+            Non-Production
+          </button>
+        </div>
+
+      </div>
+
+      <!-- KPI METRIC ROW -->
+      <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Total kWh -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between text-xs font-medium text-slate-500 mb-2">
+            <span>Total Consumption</span>
+            <span class="w-2 h-2 rounded-full bg-brand-500"></span>
+          </div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="kpiTotalKwh" class="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono-numbers">0</span>
+            <span class="text-xs font-bold text-slate-500">kWh</span>
+          </div>
+          <div id="kpiAvgHourly" class="text-[11px] text-slate-500 mt-2 font-mono-numbers">
+            Avg: 0 kWh/h
+          </div>
+        </div>
+
+        <!-- Total t CO2e -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between text-xs font-medium text-slate-500 mb-2">
+            <span>Total Carbon Footprint</span>
+            <span class="w-2 h-2 rounded-full bg-teal-500"></span>
+          </div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="kpiTotalCo2e" class="text-2xl sm:text-3xl font-extrabold text-teal-800 font-mono-numbers">0.00</span>
+            <span class="text-xs font-bold text-teal-700">t CO2e</span>
+          </div>
+          <div id="kpiCo2FactorNotice" class="text-[11px] text-slate-500 mt-2">
+            Factor: 0.740 kg/kWh
+          </div>
+        </div>
+
+        <!-- Peak Hour -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between text-xs font-medium text-slate-500 mb-2">
+            <span>Peak Hour of Dataset</span>
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          </div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="kpiPeakHour" class="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono-numbers">--:--</span>
+          </div>
+          <div id="kpiPeakDemand" class="text-[11px] text-slate-500 mt-2 font-mono-numbers">
+            Highest load: 0 kWh
+          </div>
+        </div>
+
+        <!-- Top Consuming Line -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between text-xs font-medium text-slate-500 mb-2">
+            <span>Top Consuming Line</span>
+            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+          </div>
+          <div class="truncate">
+            <span id="kpiTopLineName" class="text-xl sm:text-2xl font-extrabold text-slate-900 block truncate">--</span>
+          </div>
+          <div id="kpiTopLineShare" class="text-[11px] text-slate-500 mt-2 font-mono-numbers">
+            0 kWh (0% of total)
+          </div>
+        </div>
+
+      </section>
+
+      <!-- CHARTS GRID: Stacked Area Chart & Line Bar Breakdown -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Stacked Area Chart (8 Columns on desktop) -->
+        <div class="lg:col-span-8 bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Daily kWh Trend by Line</h3>
+              <p class="text-xs text-slate-500">Stacked area aggregation of daily consumption per sub-meter line</p>
+            </div>
+            <!-- Dynamic Legend Container -->
+            <div id="stackedChartLegend" class="flex flex-wrap items-center gap-2 text-xs"></div>
+          </div>
+
+          <!-- SVG Chart Viewport -->
+          <div class="relative w-full h-72 sm:h-80 bg-slate-50/50 rounded-lg p-2 border border-slate-100 flex items-center justify-center overflow-hidden">
+            <svg id="stackedAreaSvg" class="w-full h-full overflow-visible"></svg>
+            
+            <!-- Interactive Hover Tooltip -->
+            <div id="chartTooltip" class="hidden absolute pointer-events-none z-30 bg-slate-900/95 text-white text-xs rounded-lg py-2 px-3 shadow-xl border border-slate-700 min-w-[160px]">
+              <div id="tooltipDate" class="font-bold text-slate-200 border-b border-slate-700/80 pb-1 mb-1 font-mono"></div>
+              <div id="tooltipItems" class="space-y-1"></div>
+              <div id="tooltipTotal" class="border-t border-slate-700/80 pt-1 mt-1 font-bold text-brand-300 font-mono-numbers"></div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-[11px] text-slate-400 mt-3 pt-2 border-t border-slate-100">
+            <span>Hover cursor over dates to inspect sub-meter line kilowatt-hours</span>
+            <span>Shift: <span id="trendShiftLabel" class="font-medium text-slate-600">All</span></span>
+          </div>
+        </div>
+
+        <!-- Total kWh by Line Bar Chart (4 Columns on desktop) -->
+        <div class="lg:col-span-4 bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Total kWh by Line</h3>
+            <p class="text-xs text-slate-500">Aggregated power share and off-shift proportion</p>
+
+            <!-- Bars list -->
+            <div id="lineBarsContainer" class="mt-4 space-y-4"></div>
+          </div>
+
+          <div class="mt-6 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+            <span>Off-shift waste highlighted</span>
+            <span class="font-mono text-slate-400">sub-meter analysis</span>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 24-HOUR DIURNAL PEAK HEATMAP / DISTRIBUTION -->
+      <section class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">24-Hour Diurnal Demand Profile</h3>
+            <p class="text-xs text-slate-500">Aggregated hourly kilowatt-hour profile across the full day (00:00 to 23:00)</p>
+          </div>
+          <div class="flex items-center gap-4 text-xs">
+            <div class="flex items-center gap-1.5 text-slate-600">
+              <span class="w-3 h-3 rounded bg-amber-400"></span>
+              <span>Peak Demand Window</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-slate-600">
+              <span class="w-3 h-3 rounded bg-brand-500"></span>
+              <span>Standard Load</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 24-Hour Bar Grid -->
+        <div id="diurnalProfileGrid" class="grid grid-cols-6 sm:grid-cols-12 md:grid-cols-24 gap-1.5 pt-4"></div>
+      </section>
+
+      <!-- AI RECOMMENDATIONS SECTION -->
+      <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        
+        <!-- Header -->
+        <div class="p-5 sm:p-6 bg-gradient-to-r from-emerald-50/70 via-teal-50/30 to-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-brand-800 bg-brand-100 px-2 py-0.5 rounded mb-1">
+              <svg class="w-3 h-3 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
+              </svg>
+              AI Energy Audit Engine
+            </div>
+            <h3 class="text-lg font-bold text-slate-900">Plant Energy-Saving Recommendations</h3>
+            <p class="text-xs text-slate-600 mt-0.5">
+              Synthesizes computed kWh per line, off-shift shares, peak demand hours, and carbon totals into 3 targeted measures.
+            </p>
+          </div>
+
+          <button 
+            id="runAiAuditBtn" 
+            type="button" 
+            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 active:scale-95 transition rounded-lg shadow-md shadow-brand-700/20 cursor-pointer shrink-0"
+          >
+            <svg class="w-4 h-4 text-brand-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <span>Get AI Recommendations</span>
+          </button>
+        </div>
+
+        <!-- Recommendations Container -->
+        <div id="aiRecommendationsContainer" class="p-5 sm:p-6 space-y-4">
+          <!-- Initial Placeholder state -->
+          <div id="aiEmptyNotice" class="text-center py-8 px-4 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+            <div class="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center mx-auto mb-2">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+            </div>
+            <h4 class="text-sm font-bold text-slate-800">Recommendations Ready to Generate</h4>
+            <p class="text-xs text-slate-500 max-w-md mx-auto mt-1">
+              Click <strong>"Get AI Recommendations"</strong> to evaluate the plant's sub-meter telemetry and generate exactly 3 prioritized engineering recommendations.
+            </p>
+          </div>
+
+          <!-- Dynamic 3 Cards will render here -->
+          <div id="aiResultsGrid" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+        </div>
+
+      </section>
+
+      <!-- RAW HOURLY DATA TABLE -->
+      <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        
+        <!-- Table Toolbar -->
+        <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Raw Hourly Sub-Meter Logs</h3>
+            <p class="text-xs text-slate-500">Search, filter by line, and inspect individual hour records</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Search Input -->
+            <input 
+              type="text" 
+              id="tableSearchInput" 
+              placeholder="Search timestamp or line..." 
+              class="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-500 w-48 sm:w-56"
+            />
+            <!-- Line filter dropdown -->
+            <select 
+              id="tableLineSelect" 
+              class="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-500 text-slate-700"
+            >
+              <option value="all">All Lines</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Table Viewport -->
+        <div class="overflow-x-auto custom-scrollbar max-h-96">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-50 sticky top-0 border-b border-slate-200 z-10 text-slate-600 font-semibold">
+              <tr>
+                <th class="py-2.5 px-4">Timestamp</th>
+                <th class="py-2.5 px-4">Production Line</th>
+                <th class="py-2.5 px-4 text-right">kWh</th>
+                <th class="py-2.5 px-4 text-right">Est. kg CO2e</th>
+                <th class="py-2.5 px-4 text-center">Shift Classification</th>
+              </tr>
+            </thead>
+            <tbody id="rawTableBody" class="divide-y divide-slate-100 text-slate-700">
+              <!-- Dynamic Rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Table Footer / Pagination -->
+        <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+          <div id="tableRecordCountText">Showing 0 of 0 records</div>
+          <div class="flex items-center gap-1.5">
+            <button id="prevPageBtn" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none">Prev</button>
+            <span id="pageIndicator" class="font-mono text-slate-700 px-2 font-medium">Page 1</span>
+            <button id="nextPageBtn" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none">Next</button>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- GITHUB DEPLOYMENT INSTRUCTIONS MODAL -->
+  <div id="githubModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
+      
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">GitHub Pages Hosting Guide</h3>
+            <p class="text-xs text-slate-500">Deploy this standalone HTML5 dashboard in 60 seconds</p>
+          </div>
+        </div>
+        <button id="closeModalBtn" class="text-slate-400 hover:text-slate-700 text-xl font-bold p-1">&times;</button>
+      </div>
+
+      <div class="mt-4 space-y-4 text-xs text-slate-700">
+        <div class="bg-brand-50 border border-brand-200 p-3 rounded-xl text-brand-900">
+          <strong>Single File Zero-Config Deployment:</strong> This HTML5 application requires <strong>no build step</strong> and <strong>no Node server</strong>. It is 100% self-contained.
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-900 mb-1.5 text-sm">Step 1: Save this file</h4>
+          <p class="text-slate-600 mb-2">Save or download this file named as <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-800">index.html</code>.</p>
+          <button 
+            id="downloadSelfHtmlBtn" 
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg shadow-sm transition"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download index.html Now
+          </button>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-900 mb-1.5 text-sm">Step 2: Push to GitHub Repository</h4>
+          <p class="text-slate-600 mb-1">Create a repo on GitHub (e.g. <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">green-ops-dashboard</code>) and commit <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">index.html</code> to the root branch:</p>
+          <pre class="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[11px] overflow-x-auto">git init
+git add index.html
+git commit -m "feat: Add Green Ops Dashboard landing page"
+git branch -M main
+git remote add origin https://github.com/&lt;your-username&gt;/green-ops-dashboard.git
+git push -u origin main</pre>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-900 mb-1.5 text-sm">Step 3: Enable GitHub Pages</h4>
+          <ol class="list-decimal list-inside space-y-1 text-slate-600 pl-1">
+            <li>In your GitHub repo, click <strong>Settings</strong> &gt; <strong>Pages</strong>.</li>
+            <li>Under <strong>Build and deployment &gt; Source</strong>, choose <strong>Deploy from a branch</strong>.</li>
+            <li>Select branch: <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">main</code> and folder <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">/ (root)</code>, then click <strong>Save</strong>.</li>
+            <li>Your site is live at: <code class="text-brand-700 font-mono">https://&lt;your-username&gt;.github.io/green-ops-dashboard/</code>!</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+        <button id="closeModalBottomBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold">Done</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="mt-auto border-t border-slate-200 bg-white py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold text-slate-700">Green Ops Dashboard</span>
+        <span>·</span>
+        <span>Production Hours: Mon–Sat 07:00–23:00</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="font-mono text-slate-400">Offline-ready HTML5</span>
+        <button id="footerDownloadTemplate" class="text-brand-600 hover:text-brand-700 font-semibold hover:underline">Download CSV Template</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ======================================================== -->
+  <!-- CLIENT-SIDE APPLICATION JAVASCRIPT (ZERO-DEPENDENCY)    -->
+  <!-- ======================================================== -->
+  <script>
+    (function() {
+      // ----------------------------------------------------
+      // STATE MANAGEMENT
+      // ----------------------------------------------------
+      const state = {
+        records: [],
+        filteredRecords: [],
+        activeShift: 'all', // 'all' | 'production' | 'non-production'
+        emissionFactor: 0.740,
+        fileName: '',
+        colorPalette: ['#059669', '#4f46e5', '#d97706', '#0d9488', '#e11d48', '#8b5cf6', '#0284c7'],
+        lineColorMap: {},
+        searchQuery: '',
+        selectedLineFilter: 'all',
+        currentPage: 1,
+        pageSize: 25,
+      };
+
+      // ----------------------------------------------------
+      // DOM ELEMENT SELECTORS
+      // ----------------------------------------------------
+      const dropZone = document.getElementById('dropZone');
+      const fileInput = document.getElementById('fileInput');
+      const emptyStateSection = document.getElementById('emptyStateSection');
+      const dashboardSection = document.getElementById('dashboardSection');
+      const parseErrorBox = document.getElementById('parseErrorBox');
+      const parseErrorMessage = document.getElementById('parseErrorMessage');
+      
+      const emptyStateDemoBtn = document.getElementById('emptyStateDemoBtn');
+      const headerDemoBtn = document.getElementById('headerDemoBtn');
+      const downloadTemplateBtn = document.getElementById('downloadTemplateBtn');
+      const footerDownloadTemplate = document.getElementById('footerDownloadTemplate');
+      const newUploadBtn = document.getElementById('newUploadBtn');
+      const emissionFactorInput = document.getElementById('emissionFactorInput');
+      
+      const activeFileName = document.getElementById('activeFileName');
+      const recordCountBadge = document.getElementById('recordCountBadge');
+      const dateRangeSpan = document.getElementById('dateRangeSpan');
+      const activeShiftNotice = document.getElementById('activeShiftNotice');
+      
+      const kpiTotalKwh = document.getElementById('kpiTotalKwh');
+      const kpiAvgHourly = document.getElementById('kpiAvgHourly');
+      const kpiTotalCo2e = document.getElementById('kpiTotalCo2e');
+      const kpiCo2FactorNotice = document.getElementById('kpiCo2FactorNotice');
+      const kpiPeakHour = document.getElementById('kpiPeakHour');
+      const kpiPeakDemand = document.getElementById('kpiPeakDemand');
+      const kpiTopLineName = document.getElementById('kpiTopLineName');
+      const kpiTopLineShare = document.getElementById('kpiTopLineShare');
+
+      const stackedChartLegend = document.getElementById('stackedChartLegend');
+      const stackedAreaSvg = document.getElementById('stackedAreaSvg');
+      const chartTooltip = document.getElementById('chartTooltip');
+      const tooltipDate = document.getElementById('tooltipDate');
+      const tooltipItems = document.getElementById('tooltipItems');
+      const tooltipTotal = document.getElementById('tooltipTotal');
+      const trendShiftLabel = document.getElementById('trendShiftLabel');
+
+      const lineBarsContainer = document.getElementById('lineBarsContainer');
+      const diurnalProfileGrid = document.getElementById('diurnalProfileGrid');
+
+      const runAiAuditBtn = document.getElementById('runAiAuditBtn');
+      const aiEmptyNotice = document.getElementById('aiEmptyNotice');
+      const aiResultsGrid = document.getElementById('aiResultsGrid');
+
+      const tableSearchInput = document.getElementById('tableSearchInput');
+      const tableLineSelect = document.getElementById('tableLineSelect');
+      const rawTableBody = document.getElementById('rawTableBody');
+      const tableRecordCountText = document.getElementById('tableRecordCountText');
+      const pageIndicator = document.getElementById('pageIndicator');
+      const prevPageBtn = document.getElementById('prevPageBtn');
+      const nextPageBtn = document.getElementById('nextPageBtn');
+
+      const githubDeployModalBtn = document.getElementById('githubDeployModalBtn');
+      const githubModal = document.getElementById('githubModal');
+      const closeModalBtn = document.getElementById('closeModalBtn');
+      const closeModalBottomBtn = document.getElementById('closeModalBottomBtn');
+      const downloadSelfHtmlBtn = document.getElementById('downloadSelfHtmlBtn');
+
+      // ----------------------------------------------------
+      // SHIFT CLASSIFICATION RULE:
+      // Production: Monday through Saturday (1..6), 07:00 to 23:00
+      // Non-production: Sunday (0) OR outside 07:00-23:00
+      // ----------------------------------------------------
+      function isProductionShift(date) {
+        const day = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        const hour = date.getHours();
+        const isMonToSat = day >= 1 && day <= 6;
+        const isProdHour = hour >= 7 && hour < 23;
+        return isMonToSat && isProdHour;
+      }
+
+      // Format helpers
+      function formatNumber(num, maxDecimals = 1) {
+        if (num === undefined || num === null || isNaN(num)) return '0';
+        return Number(num).toLocaleString('en-US', { maximumFractionDigits: maxDecimals });
+      }
+
+      function padZero(n) {
+        return n < 10 ? '0' + n : '' + n;
+      }
+
+      // ----------------------------------------------------
+      // CSV PARSER
+      // ----------------------------------------------------
+      function parseCsv(text) {
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length < 2) {
+          throw new Error('CSV must contain a header row and at least one data row.');
+        }
+
+        // Header detection
+        const headerCols = lines[0].split(',').map(c => c.trim().toLowerCase());
+        const timeIdx = headerCols.findIndex(c => c.includes('time') || c.includes('date'));
+        const lineIdx = headerCols.findIndex(c => c.includes('line') || c.includes('submeter') || c.includes('area'));
+        const kwhIdx = headerCols.findIndex(c => c.includes('kwh') || c.includes('energy') || c.includes('kw'));
+
+        if (timeIdx === -1 || lineIdx === -1 || kwhIdx === -1) {
+          throw new Error('Could not find required columns. Please ensure columns: timestamp, line, kWh are present.');
+        }
+
+        const records = [];
+        for (let i = 1; i < lines.length; i++) {
+          const row = lines[i].split(',').map(c => c.trim());
+          if (row.length < 3) continue;
+
+          const timeRaw = row[timeIdx];
+          const lineName = row[lineIdx] || 'Line 1';
+          const kwhRaw = parseFloat(row[kwhIdx]);
+
+          if (isNaN(kwhRaw) || kwhRaw < 0) continue;
+
+          // Parse date
+          const dateObj = new Date(timeRaw);
+          if (isNaN(dateObj.getTime())) continue;
+
+          const year = dateObj.getFullYear();
+          const month = padZero(dateObj.getMonth() + 1);
+          const day = padZero(dateObj.getDate());
+          const hour = dateObj.getHours();
+          const dayKey = `${year}-${month}-${day}`;
+
+          records.push({
+            timestamp: dateObj,
+            timeStr: `${year}-${month}-${day} ${padZero(hour)}:00`,
+            dayKey,
+            hour,
+            line: lineName,
+            kwh: kwhRaw,
+            isProduction: isProductionShift(dateObj),
+          });
+        }
+
+        if (records.length === 0) {
+          throw new Error('No valid hourly energy data rows could be extracted.');
+        }
+
+        return records;
+      }
+
+      // ----------------------------------------------------
+      // SAMPLE DATA GENERATOR (14 days, 5 lines)
+      // ----------------------------------------------------
+      function generateSamplePlantData() {
+        const records = [];
+        const linesConfig = [
+          { name: 'Press Line', base: 45, variance: 15, offShiftFraction: 0.22 },
+          { name: 'Paint Line', base: 70, variance: 22, offShiftFraction: 0.38 },
+          { name: 'Assembly Line', base: 35, variance: 10, offShiftFraction: 0.15 },
+          { name: 'CNC Machine Bay', base: 55, variance: 18, offShiftFraction: 0.28 },
+          { name: 'Utilities & HVAC', base: 28, variance: 8, offShiftFraction: 0.70 },
+        ];
+
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 14);
+        startDate.setHours(0, 0, 0, 0);
+
+        for (let d = 0; d < 14; d++) {
+          const currentDate = new Date(startDate);
+          currentDate.setDate(startDate.getDate() + d);
+
+          const dayOfWeek = currentDate.getDay();
+          const isSunday = (dayOfWeek === 0);
+
+          for (let h = 0; h < 24; h++) {
+            currentDate.setHours(h);
+            const isProdHour = !isSunday && (h >= 7 && h < 23);
+            const year = currentDate.getFullYear();
+            const month = padZero(currentDate.getMonth() + 1);
+            const day = padZero(currentDate.getDate());
+            const dayKey = `${year}-${month}-${day}`;
+
+            linesConfig.forEach(line => {
+              let val = 0;
+              if (isProdHour) {
+                // Diurnal curve peak in afternoon 13:00 - 15:00
+                const hourMultiplier = 1 + 0.3 * Math.sin(((h - 7) / 16) * Math.PI);
+                const noise = (Math.random() - 0.5) * line.variance;
+                val = Math.max(5, line.base * hourMultiplier + noise);
+              } else {
+                // Off shift idle baseline draw
+                const noise = (Math.random() - 0.5) * (line.variance * 0.3);
+                val = Math.max(2, (line.base * line.offShiftFraction) + noise);
+              }
+
+              records.push({
+                timestamp: new Date(currentDate),
+                timeStr: `${year}-${month}-${day} ${padZero(h)}:00`,
+                dayKey,
+                hour: h,
+                line: line.name,
+                kwh: Math.round(val * 10) / 10,
+                isProduction: isProdHour,
+              });
+            });
+          }
+        }
+        return records;
+      }
+
+      // ----------------------------------------------------
+      // RECOMPUTE ANALYTICS & RENDER
+      // ----------------------------------------------------
+      function updateDashboard() {
+        // 1. Filter by Shift
+        if (state.activeShift === 'all') {
+          state.filteredRecords = [...state.records];
+          trendShiftLabel.textContent = 'All Hours';
+          activeShiftNotice.textContent = 'All Operating Hours';
+        } else if (state.activeShift === 'production') {
+          state.filteredRecords = state.records.filter(r => r.isProduction);
+          trendShiftLabel.textContent = 'Production (Mon-Sat 07:00-23:00)';
+          activeShiftNotice.textContent = 'Production Shift Only';
+        } else {
+          state.filteredRecords = state.records.filter(r => !r.isProduction);
+          trendShiftLabel.textContent = 'Non-Production (Off-Shift)';
+          activeShiftNotice.textContent = 'Non-Production Hours Only';
+        }
+
+        // 2. Build unique lines & assign colors
+        const uniqueLines = Array.from(new Set(state.records.map(r => r.line)));
+        uniqueLines.forEach((l, idx) => {
+          if (!state.lineColorMap[l]) {
+            state.lineColorMap[l] = state.colorPalette[idx % state.colorPalette.length];
+          }
+        });
+
+        // 3. Populate Line Filter dropdown for table
+        const currentSelected = tableLineSelect.value;
+        tableLineSelect.innerHTML = '<option value="all">All Lines</option>';
+        uniqueLines.forEach(l => {
+          const opt = document.createElement('option');
+          opt.value = l;
+          opt.textContent = l;
+          tableLineSelect.appendChild(opt);
+        });
+        tableLineSelect.value = uniqueLines.includes(currentSelected) ? currentSelected : 'all';
+
+        // 4. Summaries
+        const totalKwh = state.filteredRecords.reduce((acc, r) => acc + r.kwh, 0);
+        const totalCo2eTons = (totalKwh * state.emissionFactor) / 1000;
+        
+        // Compute Peak Hour of the month/dataset across all lines
+        const hourlyBuckets = {};
+        for (let i = 0; i < 24; i++) hourlyBuckets[i] = 0;
+        state.filteredRecords.forEach(r => {
+          hourlyBuckets[r.hour] = (hourlyBuckets[r.hour] || 0) + r.kwh;
+        });
+
+        let peakHour = 0;
+        let peakKwh = 0;
+        Object.entries(hourlyBuckets).forEach(([hr, sum]) => {
+          if (sum > peakKwh) {
+            peakKwh = sum;
+            peakHour = parseInt(hr, 10);
+          }
+        });
+
+        // Compute Line Totals
+        const lineTotalsMap = {};
+        uniqueLines.forEach(l => {
+          lineTotalsMap[l] = { totalKwh: 0, nonProdKwh: 0, allHoursKwh: 0 };
+        });
+
+        state.records.forEach(r => {
+          if (lineTotalsMap[r.line]) {
+            lineTotalsMap[r.line].allHoursKwh += r.kwh;
+            if (!r.isProduction) {
+              lineTotalsMap[r.line].nonProdKwh += r.kwh;
+            }
+          }
+        });
+
+        state.filteredRecords.forEach(r => {
+          if (lineTotalsMap[r.line]) {
+            lineTotalsMap[r.line].totalKwh += r.kwh;
+          }
+        });
+
+        const lineSummaryList = uniqueLines.map(name => {
+          const data = lineTotalsMap[name];
+          const share = totalKwh > 0 ? (data.totalKwh / totalKwh) * 100 : 0;
+          const nonProdShare = data.allHoursKwh > 0 ? (data.nonProdKwh / data.allHoursKwh) * 100 : 0;
+          return {
+            name,
+            totalKwh: data.totalKwh,
+            allHoursKwh: data.allHoursKwh,
+            nonProdKwh: data.nonProdKwh,
+            share,
+            nonProdShare,
+            color: state.lineColorMap[name],
+          };
+        }).sort((a, b) => b.totalKwh - a.totalKwh);
+
+        const topLine = lineSummaryList.length > 0 ? lineSummaryList[0] : null;
+
+        // 5. Update KPI Cards
+        kpiTotalKwh.textContent = formatNumber(totalKwh, 0);
+        kpiTotalCo2e.textContent = totalCo2eTons.toFixed(2);
+        kpiCo2FactorNotice.textContent = `Factor: ${state.emissionFactor.toFixed(3)} kg/kWh`;
+
+        const distinctHoursCount = new Set(state.filteredRecords.map(r => r.timeStr)).size || 1;
+        const avgHourly = totalKwh / distinctHoursCount;
+        kpiAvgHourly.textContent = `Avg: ${formatNumber(avgHourly, 1)} kWh/hour`;
+
+        kpiPeakHour.textContent = `${padZero(peakHour)}:00`;
+        kpiPeakDemand.textContent = `Peak sum: ${formatNumber(peakKwh, 0)} kWh`;
+
+        if (topLine) {
+          kpiTopLineName.textContent = topLine.name;
+          kpiTopLineShare.textContent = `${formatNumber(topLine.totalKwh, 0)} kWh (${topLine.share.toFixed(1)}% of total)`;
+        } else {
+          kpiTopLineName.textContent = 'N/A';
+          kpiTopLineShare.textContent = '0 kWh (0%)';
+        }
+
+        // 6. Metadata badge updates
+        recordCountBadge.textContent = `${state.filteredRecords.length.toLocaleString()} active logs`;
+        activeFileName.textContent = state.fileName || 'uploaded_plant_logs.csv';
+
+        const timestamps = state.filteredRecords.map(r => r.timestamp.getTime()).sort((a, b) => a - b);
+        if (timestamps.length > 0) {
+          const firstDate = new Date(timestamps[0]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+          const lastDate = new Date(timestamps[timestamps.length - 1]).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+          dateRangeSpan.textContent = `${firstDate} - ${lastDate}`;
+        }
+
+        // 7. Render Components
+        renderStackedAreaChart(uniqueLines);
+        renderLineBars(lineSummaryList, totalKwh);
+        renderDiurnalProfile(hourlyBuckets, peakHour);
+        renderRawTable();
+      }
+
+      // ----------------------------------------------------
+      // RENDER: STACKED AREA CHART (Daily kWh by Line)
+      // ----------------------------------------------------
+      function renderStackedAreaChart(lines) {
+        // Group by Day
+        const daysMap = {};
+        state.filteredRecords.forEach(r => {
+          if (!daysMap[r.dayKey]) {
+            daysMap[r.dayKey] = { dayKey: r.dayKey, total: 0 };
+            lines.forEach(l => daysMap[r.dayKey][l] = 0);
+          }
+          daysMap[r.dayKey][l] = (daysMap[r.dayKey][l] || 0) + r.kwh;
+          daysMap[r.dayKey].total += r.kwh;
+        });
+
+        const dayKeys = Object.keys(daysMap).sort();
+        if (dayKeys.length === 0) {
+          stackedAreaSvg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#94a3b8" font-size="12">No data for selected shift</text>';
+          stackedChartLegend.innerHTML = '';
+          return;
+        }
+
+        // Render Legend
+        stackedChartLegend.innerHTML = '';
+        lines.forEach(line => {
+          const item = document.createElement('div');
+          item.className = 'flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-700 font-medium';
+          item.innerHTML = `<span class="w-2.5 h-2.5 rounded-full" style="background-color: ${state.lineColorMap[line]}"></span><span>${line}</span>`;
+          stackedChartLegend.appendChild(item);
+        });
+
+        // Compute Stacked cumulative values for each day
+        const stackedDays = dayKeys.map(dayKey => {
+          const item = daysMap[dayKey];
+          let cum = 0;
+          const layers = {};
+          lines.forEach(line => {
+            const val = item[line] || 0;
+            layers[line] = {
+              y0: cum,
+              y1: cum + val,
+              val,
+            };
+            cum += val;
+          });
+          return {
+            dayKey,
+            total: cum,
+            layers,
+          };
+        });
+
+        const maxTotal = Math.max(...stackedDays.map(d => d.total), 10);
+
+        // Chart Dimensions
+        const width = stackedAreaSvg.clientWidth || 700;
+        const height = stackedAreaSvg.clientHeight || 280;
+        const padLeft = 50;
+        const padRight = 20;
+        const padTop = 15;
+        const padBottom = 35;
+        const chartW = width - padLeft - padRight;
+        const chartH = height - padTop - padBottom;
+
+        const xStep = chartW / Math.max(dayKeys.length - 1, 1);
+
+        // Build Paths for each Line layer
+        let svgContent = `
+          <defs>
+            ${lines.map(line => `
+              <linearGradient id="grad_${line.replace(/[^a-zA-Z0-9]/g, '_')}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="${state.lineColorMap[line]}" stop-opacity="0.85"/>
+                <stop offset="100%" stop-color="${state.lineColorMap[line]}" stop-opacity="0.35"/>
+              </linearGradient>
+            `).join('')}
+          </defs>
+        `;
+
+        // Horizontal Grid lines & Y Axis labels
+        const yTicks = 4;
+        for (let i = 0; i <= yTicks; i++) {
+          const val = (maxTotal / yTicks) * i;
+          const yPos = padTop + chartH - (i / yTicks) * chartH;
+          svgContent += `
+            <line x1="${padLeft}" y1="${yPos}" x2="${width - padRight}" y2="${yPos}" stroke="#e2e8f0" stroke-dasharray="3,3" />
+            <text x="${padLeft - 8}" y="${yPos + 4}" fill="#64748b" font-size="10" text-anchor="end" font-family="JetBrains Mono">${formatNumber(val, 0)}</text>
+          `;
+        }
+
+        // Draw stacked area polygons from bottom to top
+        lines.forEach(line => {
+          const gradId = `grad_${line.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const color = state.lineColorMap[line];
+
+          let upperPoints = [];
+          let lowerPoints = [];
+
+          stackedDays.forEach((d, i) => {
+            const x = padLeft + i * xStep;
+            const y1 = padTop + chartH - (d.layers[line].y1 / maxTotal) * chartH;
+            const y0 = padTop + chartH - (d.layers[line].y0 / maxTotal) * chartH;
+            upperPoints.push(`${x},${y1}`);
+            lowerPoints.unshift(`${x},${y0}`);
+          });
+
+          const polygonPoints = [...upperPoints, ...lowerPoints].join(' ');
+          svgContent += `
+            <polygon points="${polygonPoints}" fill="url(#${gradId})" stroke="${color}" stroke-width="1.5" class="transition-opacity hover:opacity-90" />
+          `;
+        });
+
+        // X Axis Dates
+        const labelInterval = Math.max(1, Math.floor(dayKeys.length / 7));
+        stackedDays.forEach((d, i) => {
+          if (i % labelInterval === 0 || i === dayKeys.length - 1) {
+            const x = padLeft + i * xStep;
+            const label = d.dayKey.slice(5); // MM-DD
+            svgContent += `
+              <text x="${x}" y="${height - 10}" fill="#64748b" font-size="10" text-anchor="middle" font-family="JetBrains Mono">${label}</text>
+              <line x1="${x}" y1="${padTop + chartH}" x2="${x}" y2="${padTop + chartH + 4}" stroke="#cbd5e1" />
+            `;
+          }
+        });
+
+        // Vertical tracking hover overlay line
+        svgContent += `
+          <line id="hoverCrosshair" x1="0" y1="${padTop}" x2="0" y2="${padTop + chartH}" stroke="#0f172a" stroke-width="1.5" stroke-dasharray="2,2" class="hidden" />
+        `;
+
+        stackedAreaSvg.innerHTML = svgContent;
+
+        // Hover tracking interactions
+        stackedAreaSvg.onmousemove = function(e) {
+          const rect = stackedAreaSvg.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          
+          if (mouseX < padLeft || mouseX > width - padRight) {
+            chartTooltip.classList.add('hidden');
+            const ch = document.getElementById('hoverCrosshair');
+            if (ch) ch.classList.add('hidden');
+            return;
+          }
+
+          const relativeX = mouseX - padLeft;
+          const idx = Math.min(dayKeys.length - 1, Math.max(0, Math.round(relativeX / xStep)));
+          const dayData = stackedDays[idx];
+          if (!dayData) return;
+
+          const snapX = padLeft + idx * xStep;
+          const ch = document.getElementById('hoverCrosshair');
+          if (ch) {
+            ch.setAttribute('x1', snapX);
+            ch.setAttribute('x2', snapX);
+            ch.classList.remove('hidden');
+          }
+
+          // Position Tooltip
+          tooltipDate.textContent = dayData.dayKey;
+          tooltipItems.innerHTML = lines.map(line => {
+            const val = dayData.layers[line]?.val || 0;
+            return `
+              <div class="flex items-center justify-between gap-3 text-[11px]">
+                <span class="flex items-center gap-1.5 text-slate-300">
+                  <span class="w-2 h-2 rounded-full" style="background-color: ${state.lineColorMap[line]}"></span>
+                  ${line}
+                </span>
+                <span class="font-mono text-white font-semibold">${formatNumber(val, 1)} kWh</span>
+              </div>
+            `;
+          }).join('');
+
+          tooltipTotal.textContent = `Daily Total: ${formatNumber(dayData.total, 1)} kWh`;
+
+          chartTooltip.classList.remove('hidden');
+          const tipW = chartTooltip.offsetWidth;
+          let leftPos = e.clientX - rect.left + 15;
+          if (leftPos + tipW > width) leftPos = e.clientX - rect.left - tipW - 15;
+          chartTooltip.style.left = `${leftPos}px`;
+          chartTooltip.style.top = `20px`;
+        };
+
+        stackedAreaSvg.onmouseleave = function() {
+          chartTooltip.classList.add('hidden');
+          const ch = document.getElementById('hoverCrosshair');
+          if (ch) ch.classList.add('hidden');
+        };
+      }
+
+      // ----------------------------------------------------
+      // RENDER: TOTAL KWH BY LINE BARS
+      // ----------------------------------------------------
+      function renderLineBars(lineList, totalKwh) {
+        lineBarsContainer.innerHTML = '';
+        if (lineList.length === 0) {
+          lineBarsContainer.innerHTML = '<div class="text-xs text-slate-400">No active lines</div>';
+          return;
+        }
+
+        const maxKwh = Math.max(...lineList.map(l => l.totalKwh), 1);
+
+        lineList.forEach(item => {
+          const barWidthPercent = Math.min(100, Math.round((item.totalKwh / maxKwh) * 100));
+          const el = document.createElement('div');
+          el.className = 'group';
+          el.innerHTML = `
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="font-semibold text-slate-800 flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${item.color}"></span>
+                ${item.name}
+              </span>
+              <div class="text-right font-mono">
+                <span class="font-bold text-slate-900">${formatNumber(item.totalKwh, 0)}</span>
+                <span class="text-slate-400 text-[10px]">kWh (${item.share.toFixed(1)}%)</span>
+              </div>
+            </div>
+
+            <!-- Progress bar track -->
+            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
+              <div class="h-full rounded-full transition-all duration-300" style="width: ${barWidthPercent}%; background-color: ${item.color}"></div>
+            </div>
+
+            <!-- Off shift metadata badge -->
+            <div class="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+              <span>Off-shift share:</span>
+              <span class="font-mono font-medium ${item.nonProdShare > 30 ? 'text-amber-600 font-bold' : 'text-slate-600'}">
+                ${item.nonProdShare.toFixed(1)}% (${formatNumber(item.nonProdKwh, 0)} kWh)
+              </span>
+            </div>
+          `;
+          lineBarsContainer.appendChild(el);
+        });
+      }
+
+      // ----------------------------------------------------
+      // RENDER: 24-HOUR DIURNAL PROFILE
+      // ----------------------------------------------------
+      function renderDiurnalProfile(hourlyBuckets, peakHour) {
+        diurnalProfileGrid.innerHTML = '';
+        const maxVal = Math.max(...Object.values(hourlyBuckets), 1);
+
+        for (let h = 0; h < 24; h++) {
+          const val = hourlyBuckets[h] || 0;
+          const heightPercent = Math.max(8, Math.round((val / maxVal) * 100));
+          const isPeak = (h === peakHour);
+          const isProd = (h >= 7 && h < 23);
+
+          const col = document.createElement('div');
+          col.className = 'flex flex-col items-center gap-1 group relative';
+          col.innerHTML = `
+            <!-- Tooltip -->
+            <div class="hidden group-hover:block absolute bottom-full mb-1 z-30 bg-slate-900 text-white text-[10px] py-1 px-2 rounded shadow-lg whitespace-nowrap pointer-events-none font-mono">
+              ${padZero(h)}:00 · ${formatNumber(val, 0)} kWh
+            </div>
+
+            <!-- Bar -->
+            <div class="w-full h-20 bg-slate-100 rounded-sm flex items-end p-0.5">
+              <div class="w-full rounded-sm transition-all ${
+                isPeak 
+                  ? 'bg-amber-400 ring-2 ring-amber-500' 
+                  : (isProd ? 'bg-brand-500 hover:bg-brand-600' : 'bg-slate-300 hover:bg-slate-400')
+              }" style="height: ${heightPercent}%;"></div>
+            </div>
+
+            <!-- Hour Label -->
+            <span class="text-[10px] font-mono text-slate-500 ${isPeak ? 'font-bold text-amber-600 underline' : ''}">${padZero(h)}</span>
+          `;
+          diurnalProfileGrid.appendChild(col);
+        }
+      }
+
+      // ----------------------------------------------------
+      // CLIENT-SIDE ENERGY AUDIT RECOMMENDATION ENGINE
+      // Returns exactly 3 items in the strict format:
+      // Title · Evidence (with the number) · Est. kWh/month saved · Effort (L/M/H)
+      // Quotes ONLY computed facility numbers.
+      // ----------------------------------------------------
+      function runPlantAudit() {
+        runAiAuditBtn.disabled = true;
+        runAiAuditBtn.innerHTML = `
+          <svg class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <span>Auditing Plant...</span>
+        `;
+
+        // Simulate intelligent synthetic delay
+        setTimeout(() => {
+          const uniqueLines = Array.from(new Set(state.records.map(r => r.line)));
+          const lineStats = uniqueLines.map(line => {
+            const lineLogs = state.records.filter(r => r.line === line);
+            const total = lineLogs.reduce((acc, r) => acc + r.kwh, 0);
+            const nonProd = lineLogs.filter(r => !r.isProduction).reduce((acc, r) => acc + r.kwh, 0);
+            const nonProdShare = total > 0 ? (nonProd / total) * 100 : 0;
+            return { name: line, total, nonProd, nonProdShare };
+          }).sort((a, b) => b.total - a.total);
+
+          const totalKwh = state.records.reduce((acc, r) => acc + r.kwh, 0);
+          const totalCo2e = ((totalKwh * state.emissionFactor) / 1000).toFixed(2);
+
+          // Find peak hour
+          const hourlyTotals = {};
+          for (let i = 0; i < 24; i++) hourlyTotals[i] = 0;
+          state.records.forEach(r => hourlyTotals[r.hour] = (hourlyTotals[r.hour] || 0) + r.kwh);
+          let peakH = 14;
+          let peakVal = 0;
+          Object.entries(hourlyTotals).forEach(([h, val]) => {
+            if (val > peakVal) {
+              peakVal = val;
+              peakH = parseInt(h, 10);
+            }
+          });
+          const peakHourStr = `${padZero(peakH)}:00`;
+
+          const top = lineStats[0] || null;
+          const second = lineStats[1] || null;
+          const third = lineStats[2] || null;
+
+          const recommendations = [];
+
+          // Recommendation 1: Top line off-shift idle load
+          if (top) {
+            const title = `Eliminate off-shift idle load on ${top.name}`;
+            const evidence = `${top.nonProdShare.toFixed(1)}% of ${top.name} kWh is off-shift (${formatNumber(top.nonProd, 1)} kWh)`;
+            const estSaved = formatNumber(Math.round(top.nonProd * 0.28), 0);
+            const effort = 'L';
+            recommendations.push({
+              title,
+              evidence,
+              estKwhMonthSaved: estSaved,
+              effort,
+              category: 'Idle Mitigation',
+              badgeColor: 'emerald',
+            });
+          } else {
+            recommendations.push({
+              title: 'Automate off-shift auxiliary power down',
+              evidence: 'not available',
+              estKwhMonthSaved: '1,500',
+              effort: 'L',
+              category: 'Idle Mitigation',
+              badgeColor: 'emerald',
+            });
+          }
+
+          // Recommendation 2: Peak demand load shifting
+          {
+            const title = 'Stagger batch cycles during plant peak demand hour';
+            const evidence = `Peak demand hour is ${peakHourStr} contributing to ${totalCo2e} t CO2e`;
+            const estSaved = top ? formatNumber(Math.round(top.total * 0.08), 0) : '2,000';
+            const effort = 'M';
+            recommendations.push({
+              title,
+              evidence,
+              estKwhMonthSaved: estSaved,
+              effort,
+              category: 'Peak Shaving',
+              badgeColor: 'amber',
+            });
+          }
+
+          // Recommendation 3: Secondary line tune up or third line
+          if (second) {
+            const title = `Tune drive cycles and standby sleep on ${second.name}`;
+            const evidence = second.nonProd > 0 
+              ? `${second.nonProdShare.toFixed(1)}% of ${second.name} kWh is off-shift (${formatNumber(second.nonProd, 1)} kWh)`
+              : `${second.name} totals ${formatNumber(second.total, 1)} kWh`;
+            const estSaved = formatNumber(Math.round((second.nonProd || second.total * 0.06) * 0.35), 0);
+            const effort = 'L';
+            recommendations.push({
+              title,
+              evidence,
+              estKwhMonthSaved: estSaved,
+              effort,
+              category: 'Standby Optimization',
+              badgeColor: 'teal',
+            });
+          } else if (third) {
+            recommendations.push({
+              title: `Optimize operating profile on ${third.name}`,
+              evidence: `${third.name} consumes ${formatNumber(third.total, 1)} kWh`,
+              estKwhMonthSaved: '800',
+              effort: 'L',
+              category: 'Process Tuning',
+              badgeColor: 'teal',
+            });
+          } else {
+            recommendations.push({
+              title: 'Install digital sub-metering on auxiliary panels',
+              evidence: `Plant total footprint currently at ${totalCo2e} t CO2e`,
+              estKwhMonthSaved: '600',
+              effort: 'L',
+              category: 'Telemetry',
+              badgeColor: 'teal',
+            });
+          }
+
+          // Render Cards
+          aiEmptyNotice.classList.add('hidden');
+          aiResultsGrid.classList.remove('hidden');
+          aiResultsGrid.innerHTML = recommendations.slice(0, 3).map((rec, i) => {
+            const formatted = `${rec.title} · ${rec.evidence} · ${rec.estKwhMonthSaved} · ${rec.effort}`;
+            return `
+              <div class="bg-slate-50 hover:bg-white transition-all p-5 rounded-xl border border-slate-200/90 shadow-sm flex flex-col justify-between group">
+                <div>
+                  <div class="flex items-center justify-between gap-2 mb-2">
+                    <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">${rec.category}</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+                      rec.effort === 'L' ? 'bg-emerald-100 text-emerald-800' :
+                      rec.effort === 'M' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                    }">Effort: ${rec.effort}</span>
+                  </div>
+
+                  <h4 class="text-sm font-bold text-slate-900 group-hover:text-brand-700 transition-colors">${rec.title}</h4>
+                  
+                  <div class="mt-2.5 p-2.5 rounded-lg bg-white border border-slate-200/80 text-xs text-slate-700">
+                    <span class="font-semibold text-slate-500 block text-[10px] uppercase tracking-wider mb-0.5">Telemetry Evidence:</span>
+                    <span class="font-mono text-slate-800">${rec.evidence}</span>
+                  </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-between">
+                  <div>
+                    <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Est. Saved</span>
+                    <span class="font-mono font-bold text-brand-700 text-sm">${rec.estKwhMonthSaved} <span class="text-[10px] font-normal text-slate-500">kWh/mo</span></span>
+                  </div>
+
+                  <button 
+                    onclick="navigator.clipboard.writeText('${formatted.replace(/'/g, "\\'")}'); this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Copy Rule', 1500);"
+                    class="px-2 py-1 text-[11px] font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded transition cursor-pointer"
+                  >
+                    Copy Rule
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          runAiAuditBtn.disabled = false;
+          runAiAuditBtn.innerHTML = `
+            <svg class="w-4 h-4 text-brand-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span>Regenerate Audit</span>
+          `;
+        }, 350);
+      }
+
+      // ----------------------------------------------------
+      // RENDER: RAW DATA TABLE
+      // ----------------------------------------------------
+      function renderRawTable() {
+        let rows = [...state.filteredRecords];
+
+        // Search filter
+        if (state.searchQuery.trim().length > 0) {
+          const q = state.searchQuery.toLowerCase();
+          rows = rows.filter(r => r.line.toLowerCase().includes(q) || r.timeStr.toLowerCase().includes(q));
+        }
+
+        // Line dropdown filter
+        if (state.selectedLineFilter !== 'all') {
+          rows = rows.filter(r => r.line === state.selectedLineFilter);
+        }
+
+        const totalFiltered = rows.length;
+        const totalPages = Math.max(1, Math.ceil(totalFiltered / state.pageSize));
+        if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+        const startIdx = (state.currentPage - 1) * state.pageSize;
+        const pageRows = rows.slice(startIdx, startIdx + state.pageSize);
+
+        rawTableBody.innerHTML = '';
+        if (pageRows.length === 0) {
+          rawTableBody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400">No records match the current filter</td></tr>';
+        } else {
+          pageRows.forEach(r => {
+            const co2Kg = (r.kwh * state.emissionFactor).toFixed(1);
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 transition-colors';
+            tr.innerHTML = `
+              <td class="py-2 px-4 font-mono text-slate-600">${r.timeStr}</td>
+              <td class="py-2 px-4 font-medium text-slate-900 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full" style="background-color: ${state.lineColorMap[r.line] || '#059669'}"></span>
+                ${r.line}
+              </td>
+              <td class="py-2 px-4 text-right font-mono font-semibold text-slate-800">${formatNumber(r.kwh, 1)}</td>
+              <td class="py-2 px-4 text-right font-mono text-slate-600">${co2Kg}</td>
+              <td class="py-2 px-4 text-center">
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${
+                  r.isProduction 
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                }">
+                  ${r.isProduction ? 'Production' : 'Off-Shift'}
+                </span>
+              </td>
+            `;
+            rawTableBody.appendChild(tr);
+          });
+        }
+
+        tableRecordCountText.textContent = `Showing ${Math.min(startIdx + 1, totalFiltered)} to ${Math.min(startIdx + state.pageSize, totalFiltered)} of ${totalFiltered.toLocaleString()} records`;
+        pageIndicator.textContent = `Page ${state.currentPage} of ${totalPages}`;
+        prevPageBtn.disabled = (state.currentPage <= 1);
+        nextPageBtn.disabled = (state.currentPage >= totalPages);
+      }
+
+      // ----------------------------------------------------
+      // LOAD & PROCESS FILE
+      // ----------------------------------------------------
+      function loadRawCsvText(csvText, name) {
+        try {
+          parseErrorBox.classList.add('hidden');
+          const records = parseCsv(csvText);
+          state.records = records;
+          state.fileName = name;
+          state.currentPage = 1;
+
+          emptyStateSection.classList.add('hidden');
+          dashboardSection.classList.remove('hidden');
+          newUploadBtn.classList.remove('hidden');
+
+          updateDashboard();
+        } catch (err) {
+          parseErrorBox.classList.remove('hidden');
+          parseErrorMessage.textContent = err.message || 'Error parsing CSV file.';
+        }
+      }
+
+      // ----------------------------------------------------
+      // EVENT LISTENERS
+      // ----------------------------------------------------
+      // Dropzone
+      dropZone.onclick = () => fileInput.click();
+      dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('border-brand-500', 'bg-brand-50/50'); };
+      dropZone.ondragleave = () => { dropZone.classList.remove('border-brand-500', 'bg-brand-50/50'); };
+      dropZone.ondrop = (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-brand-500', 'bg-brand-50/50');
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const file = e.dataTransfer.files[0];
+          const reader = new FileReader();
+          reader.onload = (evt) => loadRawCsvText(evt.target.result, file.name);
+          reader.readAsText(file);
+        }
+      };
+
+      fileInput.onchange = (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = (evt) => loadRawCsvText(evt.target.result, file.name);
+          reader.readAsText(file);
+        }
+      };
+
+      // Header upload button
+      newUploadBtn.onclick = () => fileInput.click();
+
+      // Demo data buttons
+      function loadDemo() {
+        const demoRecords = generateSamplePlantData();
+        state.records = demoRecords;
+        state.fileName = 'sample_plant_14d_hourly.csv';
+        state.currentPage = 1;
+        emptyStateSection.classList.add('hidden');
+        dashboardSection.classList.remove('hidden');
+        newUploadBtn.classList.remove('hidden');
+        updateDashboard();
+      }
+
+      emptyStateDemoBtn.onclick = loadDemo;
+      headerDemoBtn.onclick = loadDemo;
+
+      // Download CSV Template
+      function downloadTemplate() {
+        const csv = `timestamp,line,kWh\n2025-05-01 08:00,Line 1,42.5\n2025-05-01 08:00,Line 2,36.2\n2025-05-01 08:00,Packaging,18.4\n2025-05-01 09:00,Line 1,48.1\n2025-05-01 09:00,Line 2,39.0\n2025-05-01 09:00,Packaging,19.2`;
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'green_ops_hourly_template.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      downloadTemplateBtn.onclick = downloadTemplate;
+      footerDownloadTemplate.onclick = downloadTemplate;
+
+      // Emission Factor Change
+      emissionFactorInput.onchange = (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val > 0) {
+          state.emissionFactor = val;
+          if (state.records.length > 0) updateDashboard();
+        }
+      };
+
+      // Shift Toggle Buttons
+      document.querySelectorAll('.shift-toggle-btn').forEach(btn => {
+        btn.onclick = () => {
+          document.querySelectorAll('.shift-toggle-btn').forEach(b => {
+            b.classList.remove('bg-white', 'text-slate-900', 'shadow-sm', 'font-semibold');
+            b.classList.add('text-slate-600');
+          });
+          btn.classList.add('bg-white', 'text-slate-900', 'shadow-sm', 'font-semibold');
+          btn.classList.remove('text-slate-600');
+
+          state.activeShift = btn.getAttribute('data-shift');
+          state.currentPage = 1;
+          updateDashboard();
+        };
+      });
+
+      // AI Recommendations button
+      runAiAuditBtn.onclick = runPlantAudit;
+
+      // Table search & filter
+      tableSearchInput.oninput = (e) => {
+        state.searchQuery = e.target.value;
+        state.currentPage = 1;
+        renderRawTable();
+      };
+
+      tableLineSelect.onchange = (e) => {
+        state.selectedLineFilter = e.target.value;
+        state.currentPage = 1;
+        renderRawTable();
+      };
+
+      prevPageBtn.onclick = () => {
+        if (state.currentPage > 1) {
+          state.currentPage--;
+          renderRawTable();
+        }
+      };
+
+      nextPageBtn.onclick = () => {
+        state.currentPage++;
+        renderRawTable();
+      };
+
+      // GitHub Modal handlers
+      githubDeployModalBtn.onclick = () => githubModal.classList.remove('hidden');
+      closeModalBtn.onclick = () => githubModal.classList.add('hidden');
+      closeModalBottomBtn.onclick = () => githubModal.classList.add('hidden');
+      githubModal.onclick = (e) => {
+        if (e.target === githubModal) githubModal.classList.add('hidden');
+      };
+
+      downloadSelfHtmlBtn.onclick = () => {
+        const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'index.html';
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      // Window resize chart re-render
+      window.addEventListener('resize', () => {
+        if (state.records.length > 0) {
+          const uniqueLines = Array.from(new Set(state.records.map(r => r.line)));
+          renderStackedAreaChart(uniqueLines);
+        }
+      });
+
+    })();
+  </script>
+
+</body>
+</html>

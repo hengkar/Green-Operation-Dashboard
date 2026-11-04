@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan for converting the Green Ops Dashboard into a standalone, single-file HTML5 landing page application for GitHub Pages hosting, featuring client-side energy analytics, interactive stacked area and bar charts, 1-click sample plant data loading, and an embedded offline heuristic energy audit engine.",
+  "updatedAt": "2026-11-04T00:23:29.388438992Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

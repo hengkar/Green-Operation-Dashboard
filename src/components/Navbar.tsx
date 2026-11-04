@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, Factory, Settings2, RefreshCw, Upload, Check, AlertCircle } from 'lucide-react';
+import { Leaf, Factory, Settings2, RefreshCw, Upload, Check, AlertCircle, Github, Download } from 'lucide-react';
 
 interface NavbarProps {
   hasData: boolean;
@@ -9,6 +9,7 @@ interface NavbarProps {
   onEmissionFactorChange: (val: number) => void;
   onReset: () => void;
   onOpenUploadModal?: () => void;
+  onOpenGitHubModal: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -18,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   emissionFactor,
   onEmissionFactorChange,
   onReset,
+  onOpenGitHubModal,
 }) => {
   const [isEditingFactor, setIsEditingFactor] = useState(false);
   const [factorInput, setFactorInput] = useState(emissionFactor.toString());
@@ -76,6 +78,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right side controls */}
         <div className="flex flex-wrap items-center justify-end gap-2.5 w-full md:w-auto">
+          {/* GitHub Export Button */}
+          <button
+            onClick={onOpenGitHubModal}
+            className="flex items-center gap-1.5 text-xs bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 px-3 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer"
+            title="Deploy or Download HTML5 for GitHub Pages"
+          >
+            <Github className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Export for GitHub</span>
+            <span className="sm:hidden">GitHub</span>
+          </button>
+
           {/* Emission factor controller */}
           <div className="relative bg-emerald-900/70 border border-emerald-700/60 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs text-emerald-100 shadow-sm">
             <span className="text-emerald-400 font-medium whitespace-nowrap">Emission Factor:</span>

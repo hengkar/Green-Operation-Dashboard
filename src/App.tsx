@@ -14,6 +14,7 @@ import { LineBarChart } from './components/LineBarChart';
 import { PeakHourHeatmap } from './components/PeakHourHeatmap';
 import { AiRecommendationsSection } from './components/AiRecommendationsSection';
 import { DataTable } from './components/DataTable';
+import { GitHubExportModal } from './components/GitHubExportModal';
 import {
   Leaf,
   Calendar,
@@ -36,6 +37,7 @@ export default function App() {
   const [emissionFactor, setEmissionFactor] = useState<number>(0.74);
   // Shift filter: Production / Non-production / All (Production = Mon–Sat 07:00–23:00)
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>('ALL');
+  const [isGitHubModalOpen, setIsGitHubModalOpen] = useState<boolean>(false);
 
   // Compute shift counts across the entire uploaded dataset
   const { productionCount, nonProductionCount, productionKwh, nonProductionKwh } = useMemo(() => {
@@ -115,13 +117,24 @@ export default function App() {
         emissionFactor={emissionFactor}
         onEmissionFactorChange={(val) => setEmissionFactor(val)}
         onReset={handleReset}
+        onOpenGitHubModal={() => setIsGitHubModalOpen(true)}
+      />
+
+      {/* GitHub Pages Deployment Modal */}
+      <GitHubExportModal
+        isOpen={isGitHubModalOpen}
+        onClose={() => setIsGitHubModalOpen(false)}
       />
 
       {/* Main Container */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8">
         {!hasData ? (
           /* Empty State: Shown until user uploads CSV or loads sample */
-          <EmptyState onFileLoaded={handleFileLoaded} parseErrors={parseErrors} />
+          <EmptyState
+            onFileLoaded={handleFileLoaded}
+            parseErrors={parseErrors}
+            onOpenGitHubModal={() => setIsGitHubModalOpen(true)}
+          />
         ) : (
           /* Active Dashboard View */
           <div className="space-y-6 sm:space-y-8 animate-fadeIn">
